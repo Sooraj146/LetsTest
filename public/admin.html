@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - MCA Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155', 600: '#475569' },
+                        primary: { 500: '#3b82f6', 600: '#2563eb' },
+                        accent: '#8b5cf6'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-dark-900 text-slate-200 font-sans min-h-screen">
+
+<!-- ======================== LOGIN SCREEN ======================== -->
+<div id="loginScreen" class="min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div class="absolute inset-0 -z-10">
+        <div class="absolute -top-40 -right-40 w-96 h-96 bg-primary-600 rounded-full filter blur-[128px] opacity-20 animate-blob"></div>
+        <div class="absolute top-40 -left-40 w-96 h-96 bg-accent rounded-full filter blur-[128px] opacity-20 animate-blob animation-delay-2000"></div>
+    </div>
+    <div class="glass-panel w-full max-w-md p-10 rounded-2xl shadow-2xl">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-primary-600/20 border border-primary-500/40 mb-4">
+                <svg class="w-7 h-7 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+            </div>
+            <h1 class="text-3xl font-bold text-white">Admin <span class="text-primary-500">Access</span></h1>
+            <p class="text-slate-400 text-sm mt-1">MCA Test — Admin Portal</p>
+        </div>
+        <div class="space-y-4">
+            <input type="password" id="adminPasswordInput" placeholder="Admin Password"
+                   class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 transition-all">
+            <div id="loginError" class="hidden bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-lg text-center"></div>
+            <button id="loginBtn" onclick="adminLogin()"
+                    class="w-full py-3 bg-gradient-to-r from-primary-600 to-accent hover:from-primary-500 hover:to-purple-500 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                Login
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ======================== DASHBOARD ======================== -->
+<div id="dashboard" class="hidden flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="glass-panel border-b border-dark-700 px-4 md:px-6 py-3 md:py-4 flex justify-between items-center sticky top-0 z-30">
+        <div class="flex items-center gap-2 md:gap-3">
+            <span class="text-xl md:text-2xl font-bold text-white">MCA <span class="text-primary-500">Test</span></span>
+            <span class="px-2 py-0.5 text-xs font-semibold bg-accent/20 border border-accent/40 text-purple-300 rounded-full">Admin</span>
+        </div>
+        <button onclick="adminLogout()" class="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm border border-dark-700 rounded-lg hover:bg-dark-800 text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 md:gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+            <span class="hidden sm:inline">Logout</span>
+        </button>
+    </header>
+
+    <!-- Tab Navigation -->
+    <div class="border-b border-dark-700 bg-dark-900/80 sticky top-[53px] md:top-[65px] z-20">
+        <div class="flex px-4 md:px-6 gap-0 overflow-x-auto custom-scrollbar" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
+            <button class="tab-btn active-tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                <span class="hidden sm:inline">Leaderboard</span>
+                <span class="sm:hidden">Ranks</span>
+            </button>
+            <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                Analytics
+            </button>
+            <button class="tab-btn" data-tab="questions" onclick="switchTab('questions')">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span class="hidden sm:inline">Manage Questions</span>
+                <span class="sm:hidden">Questions</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Tab Content -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+
+        <!-- ======= LEADERBOARD TAB ======= -->
+        <div id="tab-leaderboard">
+            <!-- Stat Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
+                <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
+                    <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Total</p>
+                    <p id="statTotal" class="text-2xl md:text-3xl font-bold text-white">--</p>
+                </div>
+                <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
+                    <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Avg Score</p>
+                    <p id="statAvg" class="text-2xl md:text-3xl font-bold text-primary-400">--</p>
+                </div>
+                <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
+                    <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Highest</p>
+                    <p id="statHigh" class="text-2xl md:text-3xl font-bold text-emerald-400">--</p>
+                </div>
+                <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
+                    <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Pass ≥15</p>
+                    <p id="statPass" class="text-2xl md:text-3xl font-bold text-yellow-400">--</p>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="glass-panel rounded-2xl border border-dark-700 overflow-hidden">
+                <div class="px-4 py-3 border-b border-dark-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <h2 class="font-semibold text-white">Student Rankings</h2>
+                    <input id="searchInput" type="text" placeholder="Search name or roll no..."
+                           class="px-3 py-1.5 text-sm bg-dark-800 border border-dark-700 rounded-lg focus:ring-1 focus:ring-primary-500 outline-none text-white placeholder-slate-500 w-full sm:w-52"
+                           oninput="filterTable(this.value)">
+                </div>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-sm">
+                        <thead class="bg-dark-800/70">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rank</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Student</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Roll No</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">P&L</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Analogy</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">T&W</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">NS</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody" class="divide-y divide-dark-700">
+                            <tr><td colspan="9" class="text-center py-10 text-slate-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======= ANALYTICS TAB ======= -->
+        <div id="tab-analytics" class="hidden">
+            <div class="flex flex-wrap gap-2 mb-6" id="sectionFilterBtns"></div>
+            <div class="glass-panel rounded-2xl border border-dark-700 p-6">
+                <h2 id="analyticsTitle" class="font-semibold text-white mb-6">Per-Question Performance</h2>
+                <div class="relative" style="height: 320px;">
+                    <canvas id="analyticsChart"></canvas>
+                </div>
+            </div>
+            <!-- Per-question table -->
+            <div class="mt-6 glass-panel rounded-2xl border border-dark-700 overflow-hidden">
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-sm">
+                        <thead class="bg-dark-800/70">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Question</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Correct</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Wrong</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Skipped</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Success %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analyticsBody" class="divide-y divide-dark-700">
+                            <tr><td colspan="5" class="text-center py-10 text-slate-500">Select a section above</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======= QUESTIONS TAB ======= -->
+        <div id="tab-questions" class="hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+                <div class="flex gap-2 flex-wrap" id="qSectionFilter"></div>
+                <button onclick="openQuestionModal(null)"
+                        class="w-full sm:w-auto px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 flex-shrink-0 text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Add Question
+                </button>
+            </div>
+            <div id="questionsList" class="space-y-4">
+                <p class="text-slate-500 text-center py-10">Loading questions...</p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- ======= QUESTION MODAL ======= -->
+<div id="questionModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-2 md:p-4">
+    <div class="bg-dark-800 border border-dark-700 rounded-xl md:rounded-2xl p-4 md:p-6 max-w-2xl w-full shadow-2xl max-h-[95dvh] overflow-y-auto custom-scrollbar">
+        <h3 id="modalTitle" class="text-xl font-bold text-white mb-6">Add Question</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1.5">Section</label>
+                <input type="text" id="mSection" list="sectionsList" placeholder="e.g. Age Calculation"
+                       class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500">
+                <datalist id="sectionsList"></datalist>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-300 mb-1.5">Question Text</label>
+                <textarea id="mQuestion" rows="3" placeholder="Enter the question..."
+                          class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 resize-none"></textarea>
+            </div>
+            <div class="grid grid-cols-1 gap-3">
+                <label class="block text-sm font-medium text-slate-300">Options <span class="text-slate-500 font-normal">(click the radio button to mark correct answer)</span></label>
+                <div id="optionsForm" class="space-y-2.5">
+                    <!-- Option inputs rendered by JS -->
+                </div>
+            </div>
+        </div>
+        <div id="modalError" class="hidden mt-4 bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-lg text-center"></div>
+        <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-dark-700">
+            <button onclick="closeQuestionModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors">Cancel</button>
+            <button id="modalSaveBtn" onclick="saveQuestion()" class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ======= DELETE CONFIRM MODAL ======= -->
+<div id="deleteModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+        <h3 class="text-xl font-bold text-white mb-2">Delete Question</h3>
+        <p class="text-slate-400 mb-6">Are you sure you want to delete this question? This action cannot be undone.</p>
+        <div class="flex justify-end gap-3">
+            <button onclick="closeDeleteModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors">Cancel</button>
+            <button id="confirmDeleteBtn" class="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors">Delete</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 16px; font-size: 0.875rem; font-weight: 500;
+    color: #94a3b8; border-bottom: 2px solid transparent;
+    transition: all 0.2s; white-space: nowrap;
+}
+.tab-btn:hover { color: #f1f5f9; }
+.active-tab { color: #3b82f6 !important; border-bottom-color: #3b82f6; }
+.filter-pill {
+    padding: 6px 14px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;
+    border: 1px solid #334155; color: #94a3b8; background: transparent;
+    cursor: pointer; transition: all 0.15s;
+}
+.filter-pill:hover { border-color: #64748b; color: #f1f5f9; }
+.filter-pill.active-pill { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.5); color: #3b82f6; }
+</style>
+
+<script src="js/api.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

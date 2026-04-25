@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCA Test - Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155' },
+                        primary: { 500: '#3b82f6', 600: '#2563eb' },
+                        accent: '#8b5cf6'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-dark-900 text-slate-200 font-sans min-h-[100dvh] flex items-center justify-center relative p-3 md:p-8">
+    <!-- Background blobs -->
+    <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-600 rounded-full filter blur-[128px] opacity-20"></div>
+        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent rounded-full filter blur-[128px] opacity-20"></div>
+    </div>
+
+    <div class="glass-panel w-full max-w-5xl p-5 md:p-12 rounded-2xl md:rounded-3xl shadow-2xl">
+        <div class="text-center mb-7 md:mb-10">
+            <div class="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full bg-green-500/20 border border-green-500/40 mb-3 md:mb-4">
+                <svg class="w-6 h-6 md:w-8 md:h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <h1 class="text-2xl md:text-4xl font-bold text-white mb-2">Test <span class="text-primary-500">Completed!</span></h1>
+            <p id="studentGreeting" class="text-slate-400 text-base md:text-lg">Loading your results...</p>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-8 items-start">
+
+            <!-- LEFT: Donut Chart -->
+            <div class="bg-dark-800/60 border border-dark-700 rounded-xl md:rounded-2xl p-5 md:p-6 flex flex-col items-center">
+                <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-widest mb-4 md:mb-6">Answer Breakdown</h3>
+                <div class="relative w-40 h-40 md:w-52 md:h-52">
+                    <canvas id="donutChart"></canvas>
+                    <!-- Center label -->
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span id="centerScore" class="text-4xl font-bold text-white">--</span>
+                        <span class="text-slate-400 text-sm">/30 correct</span>
+                    </div>
+                </div>
+                <!-- Legend -->
+                <div class="mt-6 grid grid-cols-3 gap-4 w-full text-center">
+                    <div>
+                        <div class="flex items-center justify-center gap-1.5 mb-1">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                            <span class="text-xs text-slate-400">Correct</span>
+                        </div>
+                        <p id="correctCount" class="text-xl font-bold text-emerald-400">--</p>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-center gap-1.5 mb-1">
+                            <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                            <span class="text-xs text-slate-400">Wrong</span>
+                        </div>
+                        <p id="wrongCount" class="text-xl font-bold text-red-400">--</p>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-center gap-1.5 mb-1">
+                            <span class="w-3 h-3 rounded-full bg-slate-600"></span>
+                            <span class="text-xs text-slate-400">Skipped</span>
+                        </div>
+                        <p id="skippedCount" class="text-xl font-bold text-slate-400">--</p>
+                    </div>
+                </div>
+                <!-- Accuracy Badge -->
+                <div id="accuracyBadge" class="mt-6 px-4 py-2 rounded-full bg-primary-600/20 border border-primary-500/40 text-primary-400 text-sm font-semibold">
+                    --% Accuracy
+                </div>
+            </div>
+
+            <!-- RIGHT: Section Breakdown -->
+            <div class="bg-dark-800/60 border border-dark-700 rounded-2xl p-6">
+                <h3 class="text-base font-semibold text-slate-300 uppercase tracking-widest mb-6">Section Breakdown</h3>
+                <div id="sectionScoresContainer" class="space-y-5">
+                    <!-- Skeleton loader -->
+                    <div class="animate-pulse space-y-5">
+                        <div class="h-12 bg-dark-700 rounded-xl"></div>
+                        <div class="h-12 bg-dark-700 rounded-xl"></div>
+                        <div class="h-12 bg-dark-700 rounded-xl"></div>
+                        <div class="h-12 bg-dark-700 rounded-xl"></div>
+                        <div class="h-12 bg-dark-700 rounded-xl"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="mt-7 md:mt-10 pt-5 md:pt-8 border-t border-dark-700 flex flex-col sm:flex-row justify-center items-center gap-3 md:gap-4">
+            <a href="assets/answer_key.pdf" target="_blank" download
+               class="w-full sm:w-auto px-6 md:px-8 py-3 bg-dark-800 hover:bg-dark-700 border border-dark-600 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-3 text-sm md:text-base">
+                <svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Download Answer Key
+            </a>
+            <button onclick="logout()"
+                    class="w-full sm:w-auto px-6 md:px-8 py-3 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white rounded-xl font-semibold shadow-lg transition-all text-sm md:text-base">
+                Exit
+            </button>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/result.js"></script>
+    <script>
+        function logout() {
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

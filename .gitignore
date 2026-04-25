@@ -1,0 +1,25 @@
+# ========================
+# Dependencies
+# ========================
+node_modules/
+
+# ========================
+# Environment variables
+# NEVER upload .env — it contains your DB password and admin password
+# ========================
+.env
+.env.*
+!.env.example
+
+# ========================
+# OS / Editor junk
+# ========================
+.DS_Store
+Thumbs.db
+killServer
+
+# ========================
+# Logs
+# ========================
+*.log
+npm-debug.log*
