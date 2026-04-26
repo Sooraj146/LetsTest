@@ -7,6 +7,7 @@ const {
   addQuestion,
   updateQuestion,
   deleteQuestion,
+  clearAllUsers,
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.get('/questions', getAdminQuestions);
 router.post('/questions', addQuestion);
 router.put('/questions/:id', updateQuestion);
 router.delete('/questions/:id', deleteQuestion);
+router.delete('/users', clearAllUsers);
 
 module.exports = router;

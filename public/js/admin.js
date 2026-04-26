@@ -432,3 +432,127 @@ function closeDeleteModal() {
     modal.classList.remove('flex');
     deletingQuestionId = null;
 }
+
+// ----------------------------------------------------------------
+// PDF DOWNLOAD
+// ----------------------------------------------------------------
+function downloadPDF() {
+    if (!allLeaderboard.length) {
+        alert('No student data to export yet.');
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+
+    // Title
+    doc.setFontSize(20);
+    doc.setTextColor(30, 41, 59);
+    doc.text('MCA Test - Student Progress Report', 14, 18);
+
+    // Subtitle
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
+    doc.text(`Total Students: ${allLeaderboard.length}`, 14, 32);
+
+    const sections = ['Age Calculation', 'Profit & Loss', 'Analogy', 'Time & Work', 'Number Series'];
+
+    const rows = allLeaderboard.map(u => {
+        const pct = Math.round((u.totalScore / 30) * 100);
+        const grade = pct >= 90 ? 'A+' : pct >= 75 ? 'A' : pct >= 60 ? 'B' : pct >= 50 ? 'C' : 'F';
+        return [
+            u.rank,
+            u.name,
+            u.rollNumber,
+            u.sectionScores?.['Age Calculation'] ?? '-',
+            u.sectionScores?.['Profit & Loss'] ?? '-',
+            u.sectionScores?.['Analogy'] ?? '-',
+            u.sectionScores?.['Time & Work'] ?? '-',
+            u.sectionScores?.['Number Series'] ?? '-',
+            `${u.totalScore}/30`,
+            grade,
+        ];
+    });
+
+    doc.autoTable({
+        head: [['Rank', 'Name', 'Roll No', 'Age Calc', 'P&L', 'Analogy', 'T&W', 'Num Series', 'Total', 'Grade']],
+        body: rows,
+        startY: 38,
+        styles: { fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
+        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        alternateRowStyles: { fillColor: [241, 245, 249] },
+        columnStyles: {
+            0: { cellWidth: 12, halign: 'center' },
+            1: { cellWidth: 40 },
+            2: { cellWidth: 25 },
+            3: { cellWidth: 20, halign: 'center' },
+            4: { cellWidth: 14, halign: 'center' },
+            5: { cellWidth: 20, halign: 'center' },
+            6: { cellWidth: 14, halign: 'center' },
+            7: { cellWidth: 24, halign: 'center' },
+            8: { cellWidth: 20, halign: 'center' },
+            9: { cellWidth: 16, halign: 'center' },
+        },
+        didParseCell: (data) => {
+            if (data.section === 'body' && data.column.index === 9) {
+                const grade = data.cell.raw;
+                const colors = { 'A+': [16,185,129], 'A': [52,211,153], 'B': [234,179,8], 'C': [249,115,22], 'F': [239,68,68] };
+                if (colors[grade]) data.cell.styles.textColor = colors[grade];
+                data.cell.styles.fontStyle = 'bold';
+            }
+        },
+    });
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`MCA Test — Confidential | Page ${i} of ${pageCount}`, 14, doc.internal.pageSize.height - 8);
+    }
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    doc.save(`MCA_Test_Results_${dateStr}.pdf`);
+}
+
+// ----------------------------------------------------------------
+// CLEAR ALL USERS
+// ----------------------------------------------------------------
+function openClearUsersModal() {
+    document.getElementById('clearUsersCount').textContent = allLeaderboard.length;
+    const modal = document.getElementById('clearUsersModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeClearUsersModal() {
+    const modal = document.getElementById('clearUsersModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function confirmClearUsers() {
+    const btn = document.getElementById('confirmClearBtn');
+    btn.disabled = true;
+    btn.textContent = 'Clearing...';
+
+    const res = await adminFetch('/api/admin/users', { method: 'DELETE' });
+
+    if (res.ok) {
+        closeClearUsersModal();
+        allLeaderboard = [];
+        renderLeaderboard([]);
+        // Reset stat cards
+        document.getElementById('statTotal').textContent = '0';
+        document.getElementById('statAvg').textContent = '--';
+        document.getElementById('statHigh').textContent = '--';
+        document.getElementById('statPass').textContent = '--';
+    } else {
+        btn.textContent = 'Failed. Try again.';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Yes, Clear All';
+}

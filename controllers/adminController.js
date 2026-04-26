@@ -119,3 +119,14 @@ exports.deleteQuestion = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc  Delete ALL user records (reset for next test)
+// @route DELETE /api/admin/users
+exports.clearAllUsers = async (req, res) => {
+  try {
+    const result = await User.deleteMany({});
+    res.status(200).json({ message: `${result.deletedCount} user(s) cleared successfully.` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
