@@ -445,6 +445,18 @@ function downloadPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape', 'mm', 'a4');
 
+    // --- Dynamically extract all section names from actual data ---
+    const sectionSet = new Set();
+    allLeaderboard.forEach(u => Object.keys(u.sectionScores || {}).forEach(s => sectionSet.add(s)));
+    const sections = [...sectionSet];
+
+    // Short labels for headers (keeps the PDF compact)
+    const shortLabel = s => s
+        .replace('Age Calculation', 'Age Calc')
+        .replace('Profit & Loss', 'P&L')
+        .replace('Time & Work', 'T&W')
+        .replace('Number Series', 'Num Series');
+
     // Title
     doc.setFontSize(20);
     doc.setTextColor(30, 41, 59);
@@ -456,55 +468,45 @@ function downloadPDF() {
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
     doc.text(`Total Students: ${allLeaderboard.length}`, 14, 32);
 
-    const sections = ['Age Calculation', 'Profit & Loss', 'Analogy', 'Time & Work', 'Number Series'];
+    // Build rows — section columns are fully dynamic
+    const rows = allLeaderboard.map(u => [
+        u.rank,
+        u.name,
+        u.rollNumber,
+        ...sections.map(s => u.sectionScores?.[s] ?? '-'),
+        `${u.totalScore}/30`,
+    ]);
 
-    const rows = allLeaderboard.map(u => {
-        const pct = Math.round((u.totalScore / 30) * 100);
-        const grade = pct >= 90 ? 'A+' : pct >= 75 ? 'A' : pct >= 60 ? 'B' : pct >= 50 ? 'C' : 'F';
-        return [
-            u.rank,
-            u.name,
-            u.rollNumber,
-            u.sectionScores?.['Age Calculation'] ?? '-',
-            u.sectionScores?.['Profit & Loss'] ?? '-',
-            u.sectionScores?.['Analogy'] ?? '-',
-            u.sectionScores?.['Time & Work'] ?? '-',
-            u.sectionScores?.['Number Series'] ?? '-',
-            `${u.totalScore}/30`,
-            grade,
-        ];
+    // Dynamic column widths — fixed cols + equal-width section cols
+    const fixedWidths = { 0: 12, 1: 42, 2: 26 };
+    const lastColWidth = 22;
+    const totalPageWidth = 267; // A4 landscape usable width
+    const usedFixed = fixedWidths[0] + fixedWidths[1] + fixedWidths[2] + lastColWidth;
+    const sectionColWidth = sections.length > 0
+        ? Math.floor((totalPageWidth - usedFixed) / sections.length)
+        : 20;
+
+    const columnStyles = {
+        0: { cellWidth: fixedWidths[0], halign: 'center' },
+        1: { cellWidth: fixedWidths[1] },
+        2: { cellWidth: fixedWidths[2] },
+    };
+    sections.forEach((_, i) => {
+        columnStyles[3 + i] = { cellWidth: sectionColWidth, halign: 'center' };
     });
+    columnStyles[3 + sections.length] = { cellWidth: lastColWidth, halign: 'center' };
 
     doc.autoTable({
-        head: [['Rank', 'Name', 'Roll No', 'Age Calc', 'P&L', 'Analogy', 'T&W', 'Num Series', 'Total', 'Grade']],
+        head: [['Rank', 'Name', 'Roll No', ...sections.map(shortLabel), 'Total']],
         body: rows,
         startY: 38,
         styles: { fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
         headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', fontSize: 9 },
         alternateRowStyles: { fillColor: [241, 245, 249] },
-        columnStyles: {
-            0: { cellWidth: 12, halign: 'center' },
-            1: { cellWidth: 40 },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 20, halign: 'center' },
-            4: { cellWidth: 14, halign: 'center' },
-            5: { cellWidth: 20, halign: 'center' },
-            6: { cellWidth: 14, halign: 'center' },
-            7: { cellWidth: 24, halign: 'center' },
-            8: { cellWidth: 20, halign: 'center' },
-            9: { cellWidth: 16, halign: 'center' },
-        },
-        didParseCell: (data) => {
-            if (data.section === 'body' && data.column.index === 9) {
-                const grade = data.cell.raw;
-                const colors = { 'A+': [16,185,129], 'A': [52,211,153], 'B': [234,179,8], 'C': [249,115,22], 'F': [239,68,68] };
-                if (colors[grade]) data.cell.styles.textColor = colors[grade];
-                data.cell.styles.fontStyle = 'bold';
-            }
-        },
+        columnStyles,
     });
 
-    // Footer
+    // Footer on every page
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
