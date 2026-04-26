@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const endD = new Date(settings.endTime);
             const timerContainer = document.getElementById('testTimerContainer');
             const timerDisplay = document.getElementById('testTimerDisplay');
-            timerContainer.classList.remove('hidden');
+            timerContainer.style.display = 'block';
 
             const updateTimer = () => {
                 const diff = endD - new Date();

@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             canStart = false;
             submitBtn.disabled = true;
             submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            timerContainer.classList.remove('hidden');
+            timerContainer.style.display = 'block';
             timerLabel.textContent = 'Status';
             timerDisplay.textContent = 'Exam Ended';
             timerDisplay.classList.remove('text-primary-400');
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             canStart = false;
             submitBtn.disabled = true;
             submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            timerContainer.classList.remove('hidden');
+            timerContainer.style.display = 'block';
             
             const startD = new Date(settings.startTime);
             
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     canStart = true;
                     submitBtn.disabled = false;
                     submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    timerContainer.classList.add('hidden');
+                    timerContainer.style.display = 'none';
                     return;
                 }
                 

@@ -64,9 +64,11 @@
 
             <div id="errorMsg" class="hidden bg-red-500/10 border border-red-500/50 text-red-400 text-sm p-3 rounded-lg text-center"></div>
 
-            <div id="timerContainer" class="hidden flex flex-col items-center justify-center p-4 bg-dark-800/80 border border-primary-500/30 rounded-lg">
-                <p class="text-sm text-slate-400 mb-1" id="timerLabel">Test Starts In</p>
-                <p class="text-2xl font-mono font-bold text-primary-400 tracking-wider" id="timerDisplay">--:--:--</p>
+            <div id="timerContainer" class="hidden" style="display:none">
+                <div class="flex flex-col items-center justify-center p-4 bg-dark-800/80 border border-primary-500/30 rounded-lg">
+                    <p class="text-sm text-slate-400 mb-1" id="timerLabel">Test Starts In</p>
+                    <p class="text-2xl font-mono font-bold text-primary-400 tracking-wider" id="timerDisplay">--:--:--</p>
+                </div>
             </div>
 
             <button type="submit" id="startBtn" class="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-accent hover:from-primary-500 hover:to-purple-500 text-white rounded-lg font-semibold shadow-lg transform transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-900 focus:ring-primary-500 flex items-center justify-center gap-2">
