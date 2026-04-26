@@ -74,6 +74,52 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error(err);
     }
 
+    // --- Timer Logic ---
+    try {
+        const settings = await api.getSettings();
+        if (settings.endTime) {
+            const endD = new Date(settings.endTime);
+            const timerContainer = document.getElementById('testTimerContainer');
+            const timerDisplay = document.getElementById('testTimerDisplay');
+            timerContainer.classList.remove('hidden');
+
+            const updateTimer = () => {
+                const diff = endD - new Date();
+                if (diff <= 0) {
+                    clearInterval(window.testTimerInterval);
+                    timerDisplay.textContent = '00:00';
+                    timerDisplay.classList.remove('text-primary-400');
+                    timerDisplay.classList.add('text-red-400');
+                    // Auto submit
+                    submitTest();
+                    return;
+                }
+
+                const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+                const m = Math.floor((diff / 1000 / 60) % 60);
+                const s = Math.floor((diff / 1000) % 60);
+
+                let timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                if (h > 0) timeStr = `${h.toString().padStart(2, '0')}:` + timeStr;
+                
+                timerDisplay.textContent = timeStr;
+                
+                // Turn red when less than 5 minutes left
+                if (diff < 5 * 60 * 1000) {
+                    timerDisplay.classList.remove('text-primary-400');
+                    timerDisplay.classList.add('text-red-400', 'animate-pulse');
+                    timerContainer.classList.remove('border-primary-500/30');
+                    timerContainer.classList.add('border-red-500/50');
+                }
+            };
+            
+            updateTimer();
+            window.testTimerInterval = setInterval(updateTimer, 1000);
+        }
+    } catch (err) {
+        console.error('Failed to load timer settings', err);
+    }
+
     // --- Init nav buttons ---
     function initButtons() {
         prevBtn.addEventListener('click', () => {

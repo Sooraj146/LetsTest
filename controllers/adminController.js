@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Question = require('../models/Question');
+const Settings = require('../models/Settings');
 
 // @desc  Get leaderboard (all submitted users sorted by score)
 // @route GET /api/admin/leaderboard
@@ -126,6 +127,37 @@ exports.clearAllUsers = async (req, res) => {
   try {
     const result = await User.deleteMany({});
     res.status(200).json({ message: `${result.deletedCount} user(s) cleared successfully.` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Get test timer settings
+// @route GET /api/admin/settings
+exports.getSettings = async (req, res) => {
+  try {
+    let settings = await Settings.findOne();
+    if (!settings) {
+      settings = await Settings.create({});
+    }
+    res.status(200).json(settings);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Update test timer settings
+// @route PUT /api/admin/settings
+exports.updateSettings = async (req, res) => {
+  try {
+    let settings = await Settings.findOne();
+    if (!settings) settings = new Settings();
+    
+    settings.startTime = req.body.startTime || null;
+    settings.endTime = req.body.endTime || null;
+    
+    await settings.save();
+    res.status(200).json(settings);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

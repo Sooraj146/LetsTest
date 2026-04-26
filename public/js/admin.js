@@ -101,7 +101,7 @@ let analyticsLoaded = false;
 let questionsLoaded = false;
 
 function switchTab(tab) {
-    ['leaderboard', 'analytics', 'questions'].forEach(t => {
+    ['leaderboard', 'analytics', 'questions', 'settings'].forEach(t => {
         document.getElementById(`tab-${t}`).classList.add('hidden');
     });
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active-tab'));
@@ -110,6 +110,7 @@ function switchTab(tab) {
 
     if (tab === 'analytics' && !analyticsLoaded) { loadAnalytics(); analyticsLoaded = true; }
     if (tab === 'questions' && !questionsLoaded) { loadAdminQuestions(); questionsLoaded = true; }
+    if (tab === 'settings') { loadSettings(); }
 }
 
 // ----------------------------------------------------------------
@@ -558,3 +559,70 @@ async function confirmClearUsers() {
     btn.disabled = false;
     btn.textContent = 'Yes, Clear All';
 }
+
+// ----------------------------------------------------------------
+// TIMER SETTINGS
+// ----------------------------------------------------------------
+async function loadSettings() {
+    const res = await adminFetch('/api/admin/settings');
+    if (!res.ok) return;
+    const settings = await res.json();
+    
+    // Format dates for datetime-local input
+    if (settings.startTime) {
+        const d = new Date(settings.startTime);
+        document.getElementById('timerStart').value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    } else {
+        document.getElementById('timerStart').value = '';
+    }
+    
+    if (settings.endTime) {
+        const d = new Date(settings.endTime);
+        document.getElementById('timerEnd').value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    } else {
+        document.getElementById('timerEnd').value = '';
+    }
+}
+
+async function saveTimerSettings() {
+    const startVal = document.getElementById('timerStart').value;
+    const endVal = document.getElementById('timerEnd').value;
+    const errEl = document.getElementById('timerError');
+    const succEl = document.getElementById('timerSuccess');
+    
+    errEl.classList.add('hidden');
+    succEl.classList.add('hidden');
+    
+    let startTime = null;
+    let endTime = null;
+    
+    if (startVal) startTime = new Date(startVal).toISOString();
+    if (endVal) endTime = new Date(endVal).toISOString();
+    
+    if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
+        errEl.textContent = 'End time must be after start time.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    
+    const btn = document.getElementById('saveTimerBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    
+    const res = await adminFetch('/api/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ startTime, endTime })
+    });
+    
+    btn.disabled = false;
+    btn.textContent = 'Save Timer Settings';
+    
+    if (res.ok) {
+        succEl.classList.remove('hidden');
+        setTimeout(() => succEl.classList.add('hidden'), 3000);
+    } else {
+        errEl.textContent = 'Failed to save settings.';
+        errEl.classList.remove('hidden');
+    }
+}
+

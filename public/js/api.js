@@ -39,5 +39,12 @@ const api = {
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Failed to fetch result');
         return data;
+    },
+
+    async getSettings() {
+        const response = await fetch(`${API_BASE_URL}/users/settings`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to fetch settings');
+        return data;
     }
 };

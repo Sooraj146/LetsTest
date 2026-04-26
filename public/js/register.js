@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Check if user is already logged in and not submitted
     const sessionUser = sessionStorage.getItem('user');
     if (sessionUser) {
@@ -12,10 +12,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const form = document.getElementById('registerForm');
     const errorMsg = document.getElementById('errorMsg');
-    const submitBtn = form.querySelector('button[type="submit"]');
+    const submitBtn = document.getElementById('startBtn');
+    const timerContainer = document.getElementById('timerContainer');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const timerLabel = document.getElementById('timerLabel');
+
+    let canStart = true;
+    let timerInterval = null;
+
+    try {
+        const settings = await api.getSettings();
+        const now = new Date();
+
+        if (settings.endTime && new Date(settings.endTime) < now) {
+            canStart = false;
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            timerContainer.classList.remove('hidden');
+            timerLabel.textContent = 'Status';
+            timerDisplay.textContent = 'Exam Ended';
+            timerDisplay.classList.remove('text-primary-400');
+            timerDisplay.classList.add('text-red-400');
+        } else if (settings.startTime && new Date(settings.startTime) > now) {
+            canStart = false;
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            timerContainer.classList.remove('hidden');
+            
+            const startD = new Date(settings.startTime);
+            
+            const updateTimer = () => {
+                const diff = startD - new Date();
+                if (diff <= 0) {
+                    clearInterval(timerInterval);
+                    canStart = true;
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    timerContainer.classList.add('hidden');
+                    return;
+                }
+                
+                const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+                const m = Math.floor((diff / 1000 / 60) % 60);
+                const s = Math.floor((diff / 1000) % 60);
+                
+                timerDisplay.textContent = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            };
+            
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+    } catch (e) {
+        console.error('Failed to load settings', e);
+    }
+
+
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!canStart) return;
         
         const name = document.getElementById('name').value.trim();
         const rollNumber = document.getElementById('rollNumber').value.trim();

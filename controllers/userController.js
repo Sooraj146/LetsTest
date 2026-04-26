@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Question = require('../models/Question');
+const Settings = require('../models/Settings');
 
 // @desc    Register new user
 // @route   POST /api/users/register
@@ -137,3 +138,16 @@ exports.getResult = async (req, res) => {
   }
 };
 
+// @desc    Get test timer settings (public)
+// @route   GET /api/users/settings
+exports.getSettings = async (req, res) => {
+  try {
+    let settings = await Settings.findOne();
+    if (!settings) {
+      settings = { startTime: null, endTime: null };
+    }
+    res.status(200).json(settings);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
