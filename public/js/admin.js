@@ -474,18 +474,21 @@ function downloadCSV() {
     };
 
     // Build header row — dynamic sections in the middle
-    const headers = ['Rank', 'Name', 'Roll No', ...sections, 'Total Score', 'Total (fraction)'];
+    // Note: we avoid any 'X/Y' pattern in CSV values because Excel auto-converts them to dates.
+    const totalQuestions = sections.length * 6 || 30; // 6 questions per section
+    const headers = ['Rank', 'Name', 'Roll No', ...sections, 'Total Score', `Score out of ${totalQuestions}`];
     const rows = [headers.map(escapeCSV).join(',')];
 
     // Build data rows
     allLeaderboard.forEach(u => {
+        const maxMarks = sections.reduce((acc, s) => acc + (u.sectionScores?.[s] !== undefined ? 6 : 0), 0) || 30;
         const row = [
             u.rank,
             u.name,
             u.rollNumber,
             ...sections.map(s => u.sectionScores?.[s] ?? 0),
             u.totalScore,
-            `${u.totalScore}/${sections.reduce((acc, s) => acc + (u.sectionScores?.[s] !== undefined ? 6 : 0), 0) || 30}`,
+            `${u.totalScore} of ${maxMarks}`,  // 'X of Y' avoids Excel date parsing
         ];
         rows.push(row.map(escapeCSV).join(','));
     });

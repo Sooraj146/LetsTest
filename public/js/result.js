@@ -78,10 +78,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <span class="text-sm font-bold text-white">${score}<span class="text-slate-500 font-normal">/6</span></span>
                 </div>
                 <div class="w-full bg-dark-800 rounded-full h-2.5 overflow-hidden">
-                    <div class="${barColor} h-2.5 rounded-full transition-all duration-1000 ease-out" style="width:0%"></div>
+                    <div class="progress-bar ${barColor} h-2.5 rounded-full transition-all duration-1000 ease-out" style="width:0%"></div>
                 </div>`;
             container.appendChild(div);
-            setTimeout(() => { div.querySelector('div > div').style.width = `${pct}%`; }, 100);
+            // Use a brief timeout so the browser renders at 0% first, then animates to the target width
+            setTimeout(() => { div.querySelector('.progress-bar').style.width = `${pct}%`; }, 120);
         });
 
     } catch (error) {
