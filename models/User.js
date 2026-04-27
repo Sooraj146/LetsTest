@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
+    unique: true,
   },
   answers: {
     type: Map,
@@ -22,13 +23,7 @@ const userSchema = new mongoose.Schema({
   sectionScores: {
     type: Map,
     of: Number,
-    default: {
-      'Age Calculation': 0,
-      'Profit & Loss': 0,
-      'Analogy': 0,
-      'Time & Work': 0,
-      'Number Series': 0
-    }
+    default: {}
   },
   totalScore: {
     type: Number,

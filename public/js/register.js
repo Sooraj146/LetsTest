@@ -77,6 +77,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const email = document.getElementById('email').value.trim();
 
         errorMsg.classList.add('hidden');
+
+        // --- Instant email domain check (before hitting the server) ---
+        if (!email.toLowerCase().endsWith('@gectcr.ac.in')) {
+            errorMsg.textContent = 'Email must end with @gectcr.ac.in (e.g. 25c042.name@gectcr.ac.in)';
+            errorMsg.classList.remove('hidden');
+            return;
+        }
+
         submitBtn.disabled = true;
         submitBtn.innerHTML = `
             <svg class="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

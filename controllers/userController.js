@@ -12,45 +12,61 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide all fields' });
     }
 
-    const userExists = await User.findOne({ rollNumber });
+    // --- Email domain validation ---
+    if (!email.toLowerCase().endsWith('@gectcr.ac.in')) {
+      return res.status(400).json({ message: 'Email must be a valid @gectcr.ac.in address' });
+    }
 
-    if (userExists) {
-      // If user exists and already submitted, they cannot retake
-      if (userExists.isSubmitted) {
-        return res.status(400).json({ message: 'User with this roll number has already submitted the test' });
+    // --- Check for existing roll number ---
+    const byRoll = await User.findOne({ rollNumber });
+    if (byRoll) {
+      if (byRoll.isSubmitted) {
+        return res.status(400).json({ message: 'This roll number has already submitted the test' });
       }
-      // If user exists but hasn't submitted, allow them to resume (return success)
+      // Resume an in-progress test
       return res.status(200).json({
-        _id: userExists._id,
-        name: userExists.name,
-        rollNumber: userExists.rollNumber,
-        email: userExists.email,
-        isSubmitted: userExists.isSubmitted,
+        _id: byRoll._id,
+        name: byRoll.name,
+        rollNumber: byRoll.rollNumber,
+        email: byRoll.email,
+        isSubmitted: byRoll.isSubmitted,
         message: 'Resuming test'
       });
     }
 
-    const user = await User.create({
-      name,
-      rollNumber,
-      email
+    // --- Check for existing email ---
+    const byEmail = await User.findOne({ email: email.toLowerCase() });
+    if (byEmail) {
+      if (byEmail.isSubmitted) {
+        return res.status(400).json({ message: 'This email has already submitted the test' });
+      }
+      return res.status(400).json({ message: 'This email is already registered with a different roll number' });
+    }
+
+    const user = await User.create({ name, rollNumber, email: email.toLowerCase() });
+
+    res.status(201).json({
+      _id: user._id,
+      name: user.name,
+      rollNumber: user.rollNumber,
+      email: user.email,
+      isSubmitted: user.isSubmitted
     });
 
-    if (user) {
-      res.status(201).json({
-        _id: user._id,
-        name: user.name,
-        rollNumber: user.rollNumber,
-        email: user.email,
-        isSubmitted: user.isSubmitted
-      });
-    } else {
-      res.status(400).json({ message: 'Invalid user data' });
-    }
   } catch (error) {
+    // MongoDB duplicate-key error (race condition safety net)
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0];
+      return res.status(400).json({
+        message: field === 'email'
+          ? 'This email is already registered'
+          : 'This roll number is already registered'
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // @desc    Submit test
 // @route   POST /api/users/submit
