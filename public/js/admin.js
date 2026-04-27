@@ -435,6 +435,76 @@ function closeDeleteModal() {
 }
 
 // ----------------------------------------------------------------
+// DOWNLOAD DROPDOWN
+// ----------------------------------------------------------------
+function toggleDownloadMenu(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('downloadMenu');
+    menu.classList.toggle('hidden');
+}
+function closeDownloadMenu() {
+    document.getElementById('downloadMenu').classList.add('hidden');
+}
+// Close when clicking anywhere outside
+document.addEventListener('click', (e) => {
+    const wrapper = document.getElementById('downloadDropdownWrapper');
+    if (wrapper && !wrapper.contains(e.target)) closeDownloadMenu();
+});
+
+// ----------------------------------------------------------------
+// CSV DOWNLOAD  (fully dynamic — no hardcoded section names)
+// ----------------------------------------------------------------
+function downloadCSV() {
+    if (!allLeaderboard.length) {
+        alert('No student data to export yet.');
+        return;
+    }
+
+    // Dynamically extract all section names from the actual data
+    const sectionSet = new Set();
+    allLeaderboard.forEach(u => Object.keys(u.sectionScores || {}).forEach(s => sectionSet.add(s)));
+    const sections = [...sectionSet];
+
+    // Helper: escape a cell value for CSV (wrap in quotes if it contains comma/quote/newline)
+    const escapeCSV = (val) => {
+        const str = String(val ?? '');
+        return str.includes(',') || str.includes('"') || str.includes('\n')
+            ? `"${str.replace(/"/g, '""')}"` 
+            : str;
+    };
+
+    // Build header row — dynamic sections in the middle
+    const headers = ['Rank', 'Name', 'Roll No', ...sections, 'Total Score', 'Total (fraction)'];
+    const rows = [headers.map(escapeCSV).join(',')];
+
+    // Build data rows
+    allLeaderboard.forEach(u => {
+        const row = [
+            u.rank,
+            u.name,
+            u.rollNumber,
+            ...sections.map(s => u.sectionScores?.[s] ?? 0),
+            u.totalScore,
+            `${u.totalScore}/${sections.reduce((acc, s) => acc + (u.sectionScores?.[s] !== undefined ? 6 : 0), 0) || 30}`,
+        ];
+        rows.push(row.map(escapeCSV).join(','));
+    });
+
+    // Trigger download
+    const csvContent = '\uFEFF' + rows.join('\r\n'); // \uFEFF = BOM for Excel UTF-8 detection
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateStr = new Date().toISOString().split('T')[0];
+    a.download = `MCA_Test_Results_${dateStr}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// ----------------------------------------------------------------
 // PDF DOWNLOAD
 // ----------------------------------------------------------------
 function downloadPDF() {

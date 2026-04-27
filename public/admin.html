@@ -129,11 +129,29 @@
                         <input id="searchInput" type="text" placeholder="Search name or roll no..."
                                class="px-3 py-1.5 text-sm bg-dark-800 border border-dark-700 rounded-lg focus:ring-1 focus:ring-primary-500 outline-none text-white placeholder-slate-500 flex-1 sm:w-44"
                                oninput="filterTable(this.value)">
-                        <button onclick="downloadPDF()"
-                                class="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors flex items-center gap-1.5 flex-shrink-0">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            Download PDF
-                        </button>
+                        <!-- Download split dropdown -->
+                        <div class="relative flex-shrink-0" id="downloadDropdownWrapper">
+                            <button onclick="toggleDownloadMenu(event)"
+                                    class="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                Download
+                                <svg class="w-3.5 h-3.5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            <!-- Dropdown menu -->
+                            <div id="downloadMenu"
+                                 class="absolute right-0 mt-1.5 w-36 bg-dark-800 border border-dark-700 rounded-lg shadow-xl z-50 hidden overflow-hidden">
+                                <button onclick="downloadPDF(); closeDownloadMenu()"
+                                        class="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors">
+                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                    PDF Report
+                                </button>
+                                <button onclick="downloadCSV(); closeDownloadMenu()"
+                                        class="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors border-t border-dark-700">
+                                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    CSV Spreadsheet
+                                </button>
+                            </div>
+                        </div>
                         <button onclick="openClearUsersModal()"
                                 class="px-3 py-1.5 text-sm bg-red-600/20 hover:bg-red-600 border border-red-500/50 hover:border-red-500 text-red-400 hover:text-white rounded-lg font-medium transition-all flex items-center gap-1.5 flex-shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
