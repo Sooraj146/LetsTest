@@ -116,7 +116,7 @@
                     <p id="statHigh" class="text-2xl md:text-3xl font-bold text-emerald-400">--</p>
                 </div>
                 <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
-                    <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Pass ≥15</p>
+                    <p id="statPassLabel" class="text-xs text-slate-500 uppercase tracking-widest mb-1">Pass ≥50%</p>
                     <p id="statPass" class="text-2xl md:text-3xl font-bold text-yellow-400">--</p>
                 </div>
             </div>
@@ -143,12 +143,12 @@
                                 <button onclick="downloadPDF(); closeDownloadMenu()"
                                         class="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors">
                                     <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                                    PDF Report
+                                    PDF
                                 </button>
                                 <button onclick="downloadCSV(); closeDownloadMenu()"
                                         class="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors border-t border-dark-700">
                                     <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                    CSV Spreadsheet
+                                    CSV
                                 </button>
                             </div>
                         </div>
@@ -161,21 +161,17 @@
                 </div>
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-sm">
-                        <thead class="bg-dark-800/70">
+                        <thead class="bg-dark-800/70" id="leaderboardHead">
                             <tr>
+                                <!-- Column headers rendered dynamically by renderLeaderboard() -->
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rank</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Student</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Roll No</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Age</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">P&L</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Analogy</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">T&W</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">NS</th>
                                 <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</th>
                             </tr>
                         </thead>
                         <tbody id="leaderboardBody" class="divide-y divide-dark-700">
-                            <tr><td colspan="9" class="text-center py-10 text-slate-500">Loading...</td></tr>
+                            <tr><td colspan="4" class="text-center py-10 text-slate-500">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>

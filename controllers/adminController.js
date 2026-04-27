@@ -20,7 +20,9 @@ exports.getLeaderboard = async (req, res) => {
       submittedAt: u.createdAt,
     }));
 
-    res.status(200).json(leaderboard);
+    const totalQuestions = await Question.countDocuments({});
+
+    res.status(200).json({ leaderboard, totalQuestions });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

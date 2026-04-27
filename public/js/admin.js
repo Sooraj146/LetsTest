@@ -12,6 +12,7 @@ let activeQSection = 'All';
 let editingQuestionId = null;
 let deletingQuestionId = null;
 let selectedCorrectAnswer = null;
+let totalQuestionsGlobal = 0; // updated from API — never hardcoded
 
 // ----------------------------------------------------------------
 // HELPERS
@@ -119,30 +120,58 @@ function switchTab(tab) {
 async function loadLeaderboard() {
     const res = await adminFetch('/api/admin/leaderboard');
     if (res.status === 401) { adminLogout(); return; }
-    allLeaderboard = await res.json();
+    const payload = await res.json();
+    // API now returns { leaderboard: [...], totalQuestions: N }
+    allLeaderboard = payload.leaderboard ?? payload; // backward-compat if old format
+    totalQuestionsGlobal = payload.totalQuestions ?? 0;
     renderLeaderboard(allLeaderboard);
 }
 
 function renderLeaderboard(data) {
-    // Stat cards
+    // ---- Dynamically extract section names from submitted data ----
+    const sectionSet = new Set();
+    data.forEach(u => Object.keys(u.sectionScores || {}).forEach(s => sectionSet.add(s)));
+    const sections = [...sectionSet];
+    const colCount = 3 + sections.length + 1; // Rank + Student + Roll + sections + Total
+
+    // ---- Rebuild thead dynamically ----
+    const thL = 'px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider';
+    const thC = 'px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider';
+    document.getElementById('leaderboardHead').innerHTML = `<tr>
+        <th class="${thL}">Rank</th>
+        <th class="${thL}">Student</th>
+        <th class="${thL}">Roll No</th>
+        ${sections.map(s => `<th class="${thC}">${s}</th>`).join('')}
+        <th class="${thC}">Total</th>
+    </tr>`;
+
+    // ---- Stat cards ----
     document.getElementById('statTotal').textContent = data.length;
-    if (data.length > 0) {
-        const avg = (data.reduce((s, u) => s + u.totalScore, 0) / data.length).toFixed(1);
-        const high = data[0].totalScore;
-        const passed = data.filter(u => u.totalScore >= 15).length;
-        document.getElementById('statAvg').textContent = avg;
-        document.getElementById('statHigh').textContent = high;
-        document.getElementById('statPass').textContent = Math.round((passed / data.length) * 100) + '%';
+    const passThreshold = totalQuestionsGlobal > 0 ? Math.ceil(totalQuestionsGlobal / 2) : null;
+    if (passThreshold !== null) {
+        document.getElementById('statPassLabel').textContent = `Pass ≥${passThreshold}`;
     }
 
-    const medals = ['🥇', '🥈', '🥉'];
     const tbody = document.getElementById('leaderboardBody');
     if (!data.length) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-500">No submissions yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-10 text-slate-500">No submissions yet.</td></tr>`;
         return;
     }
 
-    const sections = ['Age Calculation', 'Profit & Loss', 'Analogy', 'Time & Work', 'Number Series'];
+    if (data.length > 0) {
+        const avg = (data.reduce((s, u) => s + u.totalScore, 0) / data.length).toFixed(1);
+        const high = data[0].totalScore;
+        const passed = passThreshold !== null ? data.filter(u => u.totalScore >= passThreshold).length : 0;
+        document.getElementById('statAvg').textContent = avg;
+        document.getElementById('statHigh').textContent = high;
+        document.getElementById('statPass').textContent =
+            data.length > 0 ? Math.round((passed / data.length) * 100) + '%' : '--';
+    }
+
+    const medals = ['🥇', '🥈', '🥉'];
+    const passGreen  = totalQuestionsGlobal > 0 ? Math.ceil(totalQuestionsGlobal * 0.8) : Infinity;
+    const passYellow = totalQuestionsGlobal > 0 ? Math.ceil(totalQuestionsGlobal * 0.5) : Infinity;
+
     tbody.innerHTML = data.map((u, i) => `
         <tr class="hover:bg-dark-800/50 transition-colors">
             <td class="px-4 py-3 font-semibold ${i < 3 ? 'text-yellow-400' : 'text-slate-400'}">
@@ -153,10 +182,10 @@ function renderLeaderboard(data) {
             ${sections.map(s => `<td class="px-4 py-3 text-center text-slate-300">${u.sectionScores?.[s] ?? '-'}</td>`).join('')}
             <td class="px-4 py-3 text-center">
                 <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold ${
-                    u.totalScore >= 24 ? 'bg-emerald-500/20 text-emerald-400' :
-                    u.totalScore >= 15 ? 'bg-yellow-500/20 text-yellow-400' :
+                    u.totalScore >= passGreen  ? 'bg-emerald-500/20 text-emerald-400' :
+                    u.totalScore >= passYellow ? 'bg-yellow-500/20 text-yellow-400' :
                     'bg-red-500/20 text-red-400'
-                }">${u.totalScore}/30</span>
+                }">${u.totalScore}${totalQuestionsGlobal > 0 ? '/' + totalQuestionsGlobal : ''}</span>
             </td>
         </tr>`).join('');
 }

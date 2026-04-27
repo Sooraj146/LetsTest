@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // --- Populate counts ---
         document.getElementById('centerScore').textContent = result.totalScore;
+        document.getElementById('totalQuestionsLabel').textContent = result.totalQuestions ?? '?';
         document.getElementById('correctCount').textContent = result.correctCount;
         document.getElementById('wrongCount').textContent = result.wrongCount;
         document.getElementById('skippedCount').textContent = result.unattemptedCount;
@@ -64,24 +65,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         sections.forEach((sec) => {
             const score = result.sectionScores[sec];
-            const pct = (score / 6) * 100;
+            const sectionTotal = (result.sectionTotals && result.sectionTotals[sec]) || 6;
+            const pct = (score / sectionTotal) * 100;
             let barColor = 'bg-primary-500';
             if (pct === 100) barColor = 'bg-emerald-500';
-            else if (pct < 50) barColor = 'bg-red-500';
-            else if (pct < 80) barColor = 'bg-yellow-500';
+            else if (pct < 50)  barColor = 'bg-red-500';
+            else if (pct < 80)  barColor = 'bg-yellow-500';
 
             const div = document.createElement('div');
             div.className = 'bg-dark-900/50 p-4 rounded-xl border border-dark-700';
             div.innerHTML = `
                 <div class="flex justify-between items-center mb-2">
                     <span class="font-medium text-slate-200 text-sm">${sec}</span>
-                    <span class="text-sm font-bold text-white">${score}<span class="text-slate-500 font-normal">/6</span></span>
+                    <span class="text-sm font-bold text-white">${score}<span class="text-slate-500 font-normal">/${sectionTotal}</span></span>
                 </div>
                 <div class="w-full bg-dark-800 rounded-full h-2.5 overflow-hidden">
                     <div class="progress-bar ${barColor} h-2.5 rounded-full transition-all duration-1000 ease-out" style="width:0%"></div>
                 </div>`;
             container.appendChild(div);
-            // Use a brief timeout so the browser renders at 0% first, then animates to the target width
+            // Brief timeout so browser renders 0% first, then animates
             setTimeout(() => { div.querySelector('.progress-bar').style.width = `${pct}%`; }, 120);
         });
 

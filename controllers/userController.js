@@ -73,13 +73,11 @@ exports.submitTest = async (req, res) => {
     const questions = await Question.find({});
     
     let totalScore = 0;
-    const sectionScores = {
-      'Age Calculation': 0,
-      'Profit & Loss': 0,
-      'Analogy': 0,
-      'Time & Work': 0,
-      'Number Series': 0
-    };
+    // Build sectionScores dynamically from whatever sections exist in the DB
+    const sectionScores = {};
+    questions.forEach(q => {
+      if (!(q.section in sectionScores)) sectionScores[q.section] = 0;
+    });
 
     questions.forEach((q) => {
       const qIdStr = q._id.toString();
@@ -117,16 +115,27 @@ exports.getResult = async (req, res) => {
       return res.status(400).json({ message: 'Test not yet submitted' });
     }
 
+    const allQuestions = await Question.find({}).select('section');
+    const totalQuestions = allQuestions.length;
+
+    // Build per-section question counts (how many questions per section)
+    const sectionTotals = {};
+    allQuestions.forEach(q => {
+      sectionTotals[q.section] = (sectionTotals[q.section] || 0) + 1;
+    });
+
     const answeredCount = user.answers.size;
     const correctCount = user.totalScore;
     const wrongCount = answeredCount - correctCount;
-    const unattemptedCount = 30 - answeredCount;
+    const unattemptedCount = totalQuestions - answeredCount;
 
     res.status(200).json({
       name: user.name,
       rollNumber: user.rollNumber,
       sectionScores: Object.fromEntries(user.sectionScores),
       totalScore: user.totalScore,
+      totalQuestions,
+      sectionTotals,
       answeredCount,
       correctCount,
       wrongCount,
