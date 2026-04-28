@@ -48,6 +48,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     const progressText        = document.getElementById('progressText');
     const progressBar         = document.getElementById('progressBar');
 
+    // --- Seeded PRNG helpers ---
+    // Converts rollNumber string → 32-bit integer seed
+    function hashSeed(str) {
+        let h = 0;
+        for (let i = 0; i < str.length; i++) {
+            h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+        }
+        return h >>> 0;
+    }
+    // mulberry32 — fast, seedable PRNG
+    function mulberry32(seed) {
+        return function () {
+            seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+            let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+            t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+    // Fisher-Yates shuffle using supplied rng
+    function seededShuffle(arr, rng) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
     // --- Fetch Questions ---
     try {
         loader.classList.remove('hidden');
@@ -59,8 +86,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!grouped[q.section]) grouped[q.section] = [];
             grouped[q.section].push(q);
         });
+
+        // Seeded shuffle: same student → same order every time (resumable)
+        const rng = mulberry32(hashSeed(user.rollNumber));
         sections = Object.keys(grouped);
-        sections.forEach(s => { questions = questions.concat(grouped[s]); });
+        sections.forEach(sec => {
+            seededShuffle(grouped[sec], rng);          // shuffle questions within section
+            grouped[sec].forEach(q => {
+                q.options = seededShuffle([...q.options], rng);  // shuffle options
+            });
+            questions = questions.concat(grouped[sec]);
+        });
 
         initButtons();
         renderSidebar();

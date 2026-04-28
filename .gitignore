@@ -23,3 +23,8 @@ killServer
 # ========================
 *.log
 npm-debug.log*
+
+# ========================
+# Static assets no longer needed (answer key is now generated dynamically)
+# ========================
+public/assets/answer_key.pdf

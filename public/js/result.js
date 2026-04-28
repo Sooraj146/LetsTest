@@ -92,3 +92,119 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('Failed to load results: ' + error.message);
     }
 });
+
+// ================================================================
+// ANSWER KEY PDF (generated dynamically from live DB questions)
+// ================================================================
+async function downloadAnswerKey() {
+    const btn = document.getElementById('answerKeyBtn');
+    btn.disabled = true;
+    btn.innerHTML = `<svg class="animate-spin w-5 h-5 text-primary-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Generating...`;
+
+    try {
+        const resp = await fetch('/api/questions/answer-key');
+        if (!resp.ok) throw new Error('Failed to fetch answer key');
+        const data = await resp.json();   // { sections: [...], questions: { section: [...] } }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('portrait', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.width;
+        const margin = 14;
+        const colW = pageWidth - margin * 2;
+
+        // ── Title ──
+        doc.setFontSize(20);
+        doc.setTextColor(30, 41, 59);
+        doc.text('MCA Test — Answer Key', margin, 18);
+
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 25);
+
+        let y = 32;
+        let qNum = 0;
+
+        data.sections.forEach(section => {
+            const qs = data.questions[section];
+
+            // ── Section header ──
+            if (y > 265) { doc.addPage(); y = 16; }
+            doc.setFontSize(11);
+            doc.setTextColor(37, 99, 235);
+            doc.setFont(undefined, 'bold');
+            doc.text(section, margin, y);
+            doc.setFont(undefined, 'normal');
+            y += 6;
+
+            qs.forEach(q => {
+                qNum++;
+                const optionLabels = ['A', 'B', 'C', 'D'];
+
+                // Question text (wrapped)
+                doc.setFontSize(9.5);
+                doc.setTextColor(30, 41, 59);
+                const qLines = doc.splitTextToSize(`Q${qNum}. ${q.questionText}`, colW);
+                const qBlockH = qLines.length * 5 + 2;
+
+                if (y + qBlockH + 28 > 282) { doc.addPage(); y = 16; }
+
+                doc.text(qLines, margin, y);
+                y += qBlockH;
+
+                // Options
+                q.options.forEach((opt, idx) => {
+                    const isCorrect = opt === q.correctAnswer;
+                    const label = `   ${optionLabels[idx]}. `;
+
+                    const optLines = doc.splitTextToSize(label + opt, colW - 6);
+                    const optH = optLines.length * 4.5 + 1;
+
+                    if (y + optH > 282) { doc.addPage(); y = 16; }
+
+                    if (isCorrect) {
+                        // Highlight correct answer row
+                        doc.setFillColor(220, 252, 231); // light green
+                        doc.roundedRect(margin - 1, y - 3.5, colW + 2, optH + 1, 1.5, 1.5, 'F');
+                        doc.setTextColor(22, 101, 52);   // dark green text
+                        doc.setFont(undefined, 'bold');
+                    } else {
+                        doc.setTextColor(71, 85, 105);
+                        doc.setFont(undefined, 'normal');
+                    }
+
+                    doc.setFontSize(9);
+                    doc.text(optLines, margin + 1, y);
+                    y += optH;
+                });
+
+                // Correct answer label
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(22, 101, 52);
+                const ansLabel = `★ Correct: ${q.correctAnswer}`;
+                const ansLines = doc.splitTextToSize(ansLabel, colW - 10);
+                doc.text(ansLines, margin + 4, y);
+                doc.setFont(undefined, 'normal');
+                y += ansLines.length * 4.5 + 5; // gap between questions
+            });
+
+            y += 4; // extra gap between sections
+        });
+
+        // ── Page numbers ──
+        const pages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text(`MCA Test — Answer Key | Page ${i} of ${pages}`, margin, doc.internal.pageSize.height - 8);
+        }
+
+        doc.save(`MCA_Test_Answer_Key_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+        alert('Could not generate answer key: ' + err.message);
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> Download Answer Key`;
+    }
+}
