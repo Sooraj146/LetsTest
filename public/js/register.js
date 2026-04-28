@@ -38,9 +38,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             submitBtn.disabled = true;
             submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
             timerContainer.style.display = 'block';
-            
+
             const startD = new Date(settings.startTime);
-            
+
             const updateTimer = () => {
                 const diff = startD - new Date();
                 if (diff <= 0) {
@@ -51,14 +51,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     timerContainer.style.display = 'none';
                     return;
                 }
-                
+
                 const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
                 const m = Math.floor((diff / 1000 / 60) % 60);
                 const s = Math.floor((diff / 1000) % 60);
-                
+
                 timerDisplay.textContent = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
             };
-            
+
             updateTimer();
             timerInterval = setInterval(updateTimer, 1000);
         }
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!canStart) return;
-        
+
         const name = document.getElementById('name').value.trim();
         const rollNumber = document.getElementById('rollNumber').value.trim();
         const email = document.getElementById('email').value.trim();
@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // --- Instant email domain check (before hitting the server) ---
         if (!email.toLowerCase().endsWith('@gectcr.ac.in')) {
-            errorMsg.textContent = 'Email must end with @gectcr.ac.in (e.g. 25c042.name@gectcr.ac.in)';
+            errorMsg.textContent = 'Email must end with @gectcr.ac.in)';
             errorMsg.classList.remove('hidden');
             return;
         }
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             const user = await api.register({ name, rollNumber, email });
-            
+
             // Store user info
             sessionStorage.setItem('user', JSON.stringify(user));
 
