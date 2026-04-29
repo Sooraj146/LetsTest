@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <span class="font-medium text-sm truncate">${sec}</span>
                 </div>
                 <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                    <span class="text-xs ${isActive ? 'text-primary-400' : 'text-slate-600'}">${answeredInSec}/6</span>
+                    <span class="text-xs ${isActive ? 'text-primary-400' : 'text-slate-600'}">${answeredInSec}/${secQuestions.length}</span>
                     <svg class="w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''} ${isActive ? 'text-primary-400' : 'text-slate-600'}"
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -298,10 +298,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         questionContainer.classList.add('opacity-0');
         setTimeout(() => {
             const q = questions[currentQuestionIndex];
-            const sectionStart = questions.findIndex(qst => qst.section === q.section);
+            const sectionQs = questions.filter(qst => qst.section === q.section);
+            const posInSection = sectionQs.indexOf(q) + 1;
 
             currentSectionTitle.textContent = q.section;
-            currentQuestionNum.textContent  = currentQuestionIndex - sectionStart + 1;
+            currentQuestionNum.textContent  = posInSection;
+            document.getElementById('sectionTotalNum').textContent = sectionQs.length;
             questionText.textContent        = q.questionText;
             optionsContainer.innerHTML      = '';
 
@@ -330,13 +332,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     updateProgress();
                     renderSidebar();
+                    updateNextBtn(); // re-check submit eligibility after each answer
                 });
 
                 optionsContainer.appendChild(label);
             });
 
             prevBtn.disabled = currentQuestionIndex === 0;
-            nextBtn.disabled = currentQuestionIndex === questions.length - 1;
+            updateNextBtn();
             questionContainer.classList.remove('opacity-0');
         }, 150);
     }
@@ -346,6 +349,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         const total    = questions.length;
         progressText.textContent = `${answered}/${total}`;
         progressBar.style.width  = `${(answered / total) * 100}%`;
+    }
+
+    function updateNextBtn() {
+        const isLastQuestion  = currentQuestionIndex === questions.length - 1;
+        const allAnswered     = Object.keys(answers).length === questions.length;
+
+        if (isLastQuestion && allAnswered) {
+            // Override Next → Submit (green, glowing)
+            nextBtn.disabled = false;
+            nextBtn.className = 'px-4 md:px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-900/40 transition-all flex items-center gap-2 text-sm ring-2 ring-emerald-400/30 animate-pulse';
+            nextBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Submit`;
+            // Clicking this Next-as-Submit opens the confirm modal
+            nextBtn.onclick = openModal;
+        } else if (isLastQuestion) {
+            // Last question but not all answered — keep as disabled Next
+            nextBtn.disabled = true;
+            nextBtn.className = 'px-4 md:px-6 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white font-medium shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-sm';
+            nextBtn.innerHTML = `Next <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`;
+            nextBtn.onclick = null;
+        } else {
+            // Normal Next — navigate forward
+            nextBtn.disabled = false;
+            nextBtn.className = 'px-4 md:px-6 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white font-medium shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-sm';
+            nextBtn.innerHTML = `Next <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`;
+            nextBtn.onclick = null; // handled by initButtons listener
+        }
     }
 
     // ================================================================
