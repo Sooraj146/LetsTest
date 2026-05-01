@@ -1,0 +1,6 @@
+section,questionText,option1,option2,option3,option4,correctAnswer
+Aptitude,What is the next number in the series: 2 4 8 16 ?,24,30,32,64,32
+Aptitude,A train travels 60 km in 1 hour. How far will it travel in 2.5 hours?,120 km,150 km,180 km,200 km,150 km
+Logical,If CAT is coded as 3120 then DOG is coded as ?,4157,5168,4146,5157,4157
+General,Which planet is known as the Red Planet?,Venus,Mars,Jupiter,Saturn,Mars
+Programming,What does HTML stand for?,Hyper Text Markup Language,High Tech Modern Language,Hyper Transfer Markup Language,Home Tool Markup Language,Hyper Text Markup Language

@@ -756,23 +756,21 @@ function handleBulkCsv(input) {
         const text = e.target.result;
         const questions = parseCSV(text);
         if (questions.length === 0) {
-            alert('No valid questions found in CSV.');
+            showResult('Error', 'No valid questions found in CSV.', 'error');
             return;
         }
 
-        if (confirm(`Detected ${questions.length} questions. Proceed with bulk upload?`)) {
-            const res = await adminFetch('/api/admin/questions/bulk', {
-                method: 'POST',
-                body: JSON.stringify(questions)
-            });
-            const data = await res.json();
-            if (res.ok) {
-                alert(data.message);
-                questionsLoaded = false;
-                await loadAdminQuestions();
-            } else {
-                alert('Error: ' + data.message);
-            }
+        const res = await adminFetch('/api/admin/questions/bulk', {
+            method: 'POST',
+            body: JSON.stringify(questions)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showResult('Upload Complete', data.message, 'success');
+            questionsLoaded = false;
+            await loadAdminQuestions();
+        } else {
+            showResult('Upload Failed', data.message, 'error');
         }
         input.value = ''; // reset input
     };
@@ -812,7 +810,7 @@ function parseCSV(text) {
     
     const missing = required.filter(h => !headers.includes(h));
     if (missing.length > 0) {
-        alert('Missing headers in CSV: ' + missing.join(', '));
+        showResult('CSV Error', 'Missing headers in CSV: ' + missing.join(', '), 'error');
         return [];
     }
 
@@ -860,13 +858,43 @@ async function confirmClearQuestions() {
         allAdminQuestions = [];
         renderQuestions('All');
         renderSectionFilter();
-        alert('All questions cleared successfully.');
+        showResult('Success', 'All questions cleared successfully.', 'success');
     } else {
         const data = await res.json();
-        alert('Error: ' + data.message);
+        showResult('Error', data.message, 'error');
     }
     btn.disabled = false;
     btn.textContent = 'Yes, Delete All';
+}
+
+// ----------------------------------------------------------------
+// RESULT MODAL HELPERS
+// ----------------------------------------------------------------
+function showResult(title, message, type = 'success') {
+    const modal = document.getElementById('resultModal');
+    const titleEl = document.getElementById('resultTitle');
+    const msgEl = document.getElementById('resultMessage');
+    const iconContainer = document.getElementById('resultIconContainer');
+
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+
+    if (type === 'success') {
+        iconContainer.className = 'w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center flex-shrink-0';
+        iconContainer.innerHTML = '<svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+    } else {
+        iconContainer.className = 'w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center flex-shrink-0';
+        iconContainer.innerHTML = '<svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeResultModal() {
+    const modal = document.getElementById('resultModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
 }
 
 
