@@ -728,3 +728,145 @@ async function saveTimerSettings() {
     }
 }
 
+// ----------------------------------------------------------------
+// BULK ADD QUESTIONS
+// ----------------------------------------------------------------
+function triggerBulkUpload() {
+    document.getElementById('bulkCsvInput').click();
+}
+
+function showBulkInfo() {
+    const modal = document.getElementById('bulkInfoModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeBulkInfo() {
+    const modal = document.getElementById('bulkInfoModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function handleBulkCsv(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const text = e.target.result;
+        const questions = parseCSV(text);
+        if (questions.length === 0) {
+            alert('No valid questions found in CSV.');
+            return;
+        }
+
+        if (confirm(`Detected ${questions.length} questions. Proceed with bulk upload?`)) {
+            const res = await adminFetch('/api/admin/questions/bulk', {
+                method: 'POST',
+                body: JSON.stringify(questions)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(data.message);
+                questionsLoaded = false;
+                await loadAdminQuestions();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        }
+        input.value = ''; // reset input
+    };
+    reader.readAsText(file);
+}
+
+function parseCSV(text) {
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length < 2) return [];
+
+    // Helper to split CSV line while respecting quotes
+    function splitCSV(line) {
+        const result = [];
+        let cur = '';
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                if (inQuote && line[i+1] === '"') { // Handle escaped quotes ""
+                    cur += '"'; i++;
+                } else {
+                    inQuote = !inQuote;
+                }
+            } else if (char === ',' && !inQuote) {
+                result.push(cur.trim());
+                cur = '';
+            } else {
+                cur += char;
+            }
+        }
+        result.push(cur.trim());
+        return result.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+    }
+
+    const headers = splitCSV(lines[0]).map(h => h.trim().toLowerCase());
+    const required = ['section', 'questiontext', 'option1', 'option2', 'option3', 'option4', 'correctanswer'];
+    
+    const missing = required.filter(h => !headers.includes(h));
+    if (missing.length > 0) {
+        alert('Missing headers in CSV: ' + missing.join(', '));
+        return [];
+    }
+
+    const results = [];
+    for (let i = 1; i < lines.length; i++) {
+        const values = splitCSV(lines[i]);
+        if (values.length < headers.length) continue;
+
+        const row = {};
+        headers.forEach((h, idx) => row[h] = values[idx]);
+
+        results.push({
+            section: row['section'],
+            questionText: row['questiontext'],
+            options: [row['option1'], row['option2'], row['option3'], row['option4']],
+            correctAnswer: row['correctanswer']
+        });
+    }
+    return results;
+}
+
+// ----------------------------------------------------------------
+// CLEAR ALL QUESTIONS
+// ----------------------------------------------------------------
+function openClearQuestionsModal() {
+    const modal = document.getElementById('clearQuestionsModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeClearQuestionsModal() {
+    const modal = document.getElementById('clearQuestionsModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function confirmClearQuestions() {
+    const btn = document.getElementById('confirmClearQuestionsBtn');
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+
+    const res = await adminFetch('/api/admin/questions', { method: 'DELETE' });
+    if (res.ok) {
+        closeClearQuestionsModal();
+        allAdminQuestions = [];
+        renderQuestions('All');
+        renderSectionFilter();
+        alert('All questions cleared successfully.');
+    } else {
+        const data = await res.json();
+        alert('Error: ' + data.message);
+    }
+    btn.disabled = false;
+    btn.textContent = 'Yes, Delete All';
+}
+
+

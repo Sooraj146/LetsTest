@@ -316,6 +316,39 @@
     </div>
 </div>
 
+<!-- ======= BULK INFO MODAL ======= -->
+<div id="bulkInfoModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
+        <h3 class="text-xl font-bold text-white mb-4">CSV Format Requirement</h3>
+        <p class="text-slate-400 mb-4 text-sm">Upload a CSV file with the following headers (order doesn't matter):</p>
+        <div class="bg-dark-900 rounded-lg p-4 mb-4 font-mono text-xs text-emerald-400 overflow-x-auto">
+            section,questionText,option1,option2,option3,option4,correctAnswer
+        </div>
+        <p class="text-slate-400 mb-6 text-sm">Note: <span class="text-white">correctAnswer</span> must exactly match one of the 4 options provided.</p>
+        <div class="flex justify-end">
+            <button onclick="closeBulkInfo()" class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors">Got it</button>
+        </div>
+    </div>
+</div>
+
+<!-- ======= CLEAR QUESTIONS CONFIRM MODAL ======= -->
+<div id="clearQuestionsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-dark-800 border border-red-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h3 class="text-xl font-bold text-white">Delete All Questions</h3>
+        </div>
+        <p class="text-slate-400 mb-2">This will permanently delete <span class="text-white font-semibold">ALL</span> questions from the database.</p>
+        <p class="text-red-400 text-sm mb-6">⚠️ This action cannot be undone.</p>
+        <div class="flex justify-end gap-3">
+            <button onclick="closeClearQuestionsModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors">Cancel</button>
+            <button id="confirmClearQuestionsBtn" onclick="confirmClearQuestions()" class="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors">Yes, Delete All</button>
+        </div>
+    </div>
+</div>
+
 <style>
 .tab-btn {
     display: flex; align-items: center; gap: 6px;

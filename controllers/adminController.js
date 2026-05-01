@@ -134,6 +134,69 @@ exports.clearAllUsers = async (req, res) => {
   }
 };
 
+// @desc  Delete ALL questions
+// @route DELETE /api/admin/questions
+exports.clearAllQuestions = async (req, res) => {
+  try {
+    const result = await Question.deleteMany({});
+    res.status(200).json({ message: `${result.deletedCount} question(s) cleared successfully.` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Bulk add questions
+// @route POST /api/admin/questions/bulk
+exports.bulkAddQuestions = async (req, res) => {
+  try {
+    const questions = req.body; // Array of { section, questionText, options, correctAnswer }
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ message: 'Invalid questions data' });
+    }
+
+    // 1. Bulk Insert
+    await Question.insertMany(questions);
+
+    // 2. Remove duplicates based on trimmed questionText
+    // We'll use aggregation to find duplicates
+    const duplicates = await Question.aggregate([
+      {
+        $project: {
+          trimmedText: { $trim: { input: "$questionText" } },
+          original: "$$ROOT"
+        }
+      },
+      {
+        $group: {
+          _id: "$trimmedText",
+          ids: { $push: "$original._id" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $match: {
+          count: { $gt: 1 }
+        }
+      }
+    ]);
+
+    let deletedCount = 0;
+    for (const group of duplicates) {
+      // Keep the first ID, delete the rest
+      const idsToDelete = group.ids.slice(1);
+      const result = await Question.deleteMany({ _id: { $in: idsToDelete } });
+      deletedCount += result.deletedCount;
+    }
+
+    res.status(201).json({
+      message: `Bulk insertion complete. ${questions.length} questions processed. ${deletedCount} duplicates removed.`,
+      insertedCount: questions.length - deletedCount
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc  Get test timer settings
 // @route GET /api/admin/settings
 exports.getSettings = async (req, res) => {

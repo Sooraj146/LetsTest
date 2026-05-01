@@ -8,6 +8,8 @@ const {
   updateQuestion,
   deleteQuestion,
   clearAllUsers,
+  clearAllQuestions,
+  bulkAddQuestions,
   getSettings,
   updateSettings,
 } = require('../controllers/adminController');
@@ -21,8 +23,10 @@ router.get('/leaderboard', getLeaderboard);
 router.get('/analytics', getQuestionAnalytics);
 router.get('/questions', getAdminQuestions);
 router.post('/questions', addQuestion);
+router.post('/questions/bulk', bulkAddQuestions);
 router.put('/questions/:id', updateQuestion);
 router.delete('/questions/:id', deleteQuestion);
+router.delete('/questions', clearAllQuestions);
 router.delete('/users', clearAllUsers);
 router.get('/settings', getSettings);
 router.put('/settings', updateSettings);
