@@ -324,34 +324,94 @@ function filterQuestions(section, btn) {
 function renderQuestions(section) {
     const filtered = section === 'All' ? allAdminQuestions : allAdminQuestions.filter(q => q.section === section);
     const container = document.getElementById('questionsList');
+
     if (!filtered.length) {
         container.innerHTML = `<p class="text-slate-500 text-center py-10">No questions found.</p>`;
         return;
     }
-    container.innerHTML = filtered.map((q) => `
-        <div class="glass-panel border border-dark-700 rounded-xl p-5">
-            <div class="flex justify-between items-start gap-4">
-                <div class="flex-1 min-w-0">
-                    <span class="inline-block px-2 py-0.5 text-xs font-semibold bg-primary-600/20 text-primary-400 border border-primary-500/30 rounded-full mb-2">${q.section}</span>
-                    <p class="text-white font-medium text-sm leading-relaxed">${q.questionText}</p>
-                    <div class="mt-3 grid grid-cols-2 gap-2">
-                        ${q.options.map(opt => `
-                            <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg ${opt === q.correctAnswer ? 'bg-emerald-500/15 border border-emerald-500/40' : 'bg-dark-800/60 border border-dark-700'}">
-                                ${opt === q.correctAnswer ? `<svg class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>` : `<span class="w-3.5 h-3.5 flex-shrink-0"></span>`}
-                                <span class="text-xs ${opt === q.correctAnswer ? 'text-emerald-300 font-semibold' : 'text-slate-400'} truncate">${opt}</span>
-                            </div>`).join('')}
+
+    // Group questions by section, preserving insertion order
+    const grouped = {};
+    filtered.forEach(q => {
+        if (!grouped[q.section]) grouped[q.section] = [];
+        grouped[q.section].push(q);
+    });
+
+    const sectionColors = [
+        'border-primary-500/40 bg-primary-500/5',
+        'border-violet-500/40 bg-violet-500/5',
+        'border-emerald-500/40 bg-emerald-500/5',
+        'border-amber-500/40 bg-amber-500/5',
+        'border-rose-500/40 bg-rose-500/5',
+        'border-cyan-500/40 bg-cyan-500/5',
+    ];
+    const badgeColors = [
+        'bg-primary-600/20 text-primary-400 border-primary-500/30',
+        'bg-violet-600/20 text-violet-400 border-violet-500/30',
+        'bg-emerald-600/20 text-emerald-400 border-emerald-500/30',
+        'bg-amber-600/20 text-amber-400 border-amber-500/30',
+        'bg-rose-600/20 text-rose-400 border-rose-500/30',
+        'bg-cyan-600/20 text-cyan-400 border-cyan-500/30',
+    ];
+    const headerColors = [
+        'text-primary-400',
+        'text-violet-400',
+        'text-emerald-400',
+        'text-amber-400',
+        'text-rose-400',
+        'text-cyan-400',
+    ];
+
+    const sectionNames = Object.keys(grouped);
+
+    container.innerHTML = sectionNames.map((sec, secIdx) => {
+        const colorIdx = secIdx % sectionColors.length;
+        const qs = grouped[sec];
+
+        const questionCards = qs.map((q, qIdx) => `
+            <div class="glass-panel border border-dark-700 rounded-xl p-5 hover:border-dark-600 transition-colors">
+                <div class="flex justify-between items-start gap-4">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xs font-mono text-slate-500">Q${qIdx + 1}</span>
+                            <span class="inline-block px-2 py-0.5 text-xs font-semibold ${badgeColors[colorIdx]} border rounded-full">${q.section}</span>
+                        </div>
+                        <p class="text-white font-medium text-sm leading-relaxed">${q.questionText}</p>
+                        <div class="mt-3 grid grid-cols-2 gap-2">
+                            ${q.options.map(opt => `
+                                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg ${opt === q.correctAnswer ? 'bg-emerald-500/15 border border-emerald-500/40' : 'bg-dark-800/60 border border-dark-700'}">
+                                    ${opt === q.correctAnswer
+                                        ? `<svg class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
+                                        : `<span class="w-3.5 h-3.5 flex-shrink-0"></span>`}
+                                    <span class="text-xs ${opt === q.correctAnswer ? 'text-emerald-300 font-semibold' : 'text-slate-400'} truncate">${opt}</span>
+                                </div>`).join('')}
+                        </div>
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                        <button onclick="openQuestionModal('${q._id}')" class="p-2 rounded-lg border border-dark-600 hover:bg-dark-700 text-slate-400 hover:text-white transition-colors" title="Edit">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                        <button onclick="openDeleteModal('${q._id}')" class="p-2 rounded-lg border border-red-500/30 hover:bg-red-500/20 text-red-400 transition-colors" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
                     </div>
                 </div>
-                <div class="flex gap-2 flex-shrink-0">
-                    <button onclick="openQuestionModal('${q._id}')" class="p-2 rounded-lg border border-dark-600 hover:bg-dark-700 text-slate-400 hover:text-white transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    </button>
-                    <button onclick="openDeleteModal('${q._id}')" class="p-2 rounded-lg border border-red-500/30 hover:bg-red-500/20 text-red-400 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
+            </div>`).join('');
+
+        return `
+            <div class="mb-8">
+                <!-- Section header -->
+                <div class="flex items-center gap-3 mb-3 pb-2 border-b ${sectionColors[colorIdx].split(' ')[0]}">
+                    <div class="w-2 h-6 rounded-full ${badgeColors[colorIdx].split(' ')[0].replace('bg-', 'bg-').replace('/20', '')}"></div>
+                    <h3 class="font-semibold text-base ${headerColors[colorIdx]}">${sec}</h3>
+                    <span class="ml-auto text-xs text-slate-500 font-mono">${qs.length} question${qs.length !== 1 ? 's' : ''}</span>
                 </div>
-            </div>
-        </div>`).join('');
+                <!-- Question cards for this section -->
+                <div class="space-y-3 pl-1">
+                    ${questionCards}
+                </div>
+            </div>`;
+    }).join('');
 }
 
 // ----------------------------------------------------------------
@@ -504,20 +564,19 @@ function downloadCSV() {
 
     // Build header row — dynamic sections in the middle
     // Note: we avoid any 'X/Y' pattern in CSV values because Excel auto-converts them to dates.
-    const totalQuestions = sections.length * 6 || 30; // 6 questions per section
-    const headers = ['Rank', 'Name', 'Roll No', ...sections, 'Total Score', `Score out of ${totalQuestions}`];
+    const totalQ = totalQuestionsGlobal > 0 ? totalQuestionsGlobal : (sections.length * 6 || 30);
+    const headers = ['Rank', 'Name', 'Roll No', ...sections, 'Total Score', `Score out of ${totalQ}`];
     const rows = [headers.map(escapeCSV).join(',')];
 
     // Build data rows
     allLeaderboard.forEach(u => {
-        const maxMarks = sections.reduce((acc, s) => acc + (u.sectionScores?.[s] !== undefined ? 6 : 0), 0) || 30;
         const row = [
             u.rank,
             u.name,
             u.rollNumber,
             ...sections.map(s => u.sectionScores?.[s] ?? 0),
             u.totalScore,
-            `${u.totalScore} of ${maxMarks}`,  // 'X of Y' avoids Excel date parsing
+            `${u.totalScore} of ${totalQ}`,  // 'X of Y' avoids Excel date parsing
         ];
         rows.push(row.map(escapeCSV).join(','));
     });
@@ -571,13 +630,14 @@ function downloadPDF() {
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
     doc.text(`Total Students: ${allLeaderboard.length}`, 14, 32);
 
+    const totalQ = totalQuestionsGlobal > 0 ? totalQuestionsGlobal : 30;
     // Build rows — section columns are fully dynamic
     const rows = allLeaderboard.map(u => [
         u.rank,
         u.name,
         u.rollNumber,
         ...sections.map(s => u.sectionScores?.[s] ?? '-'),
-        `${u.totalScore}/30`,
+        `${u.totalScore}/${totalQ}`,
     ]);
 
     // Dynamic column widths — fixed cols + equal-width section cols
