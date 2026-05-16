@@ -13,8 +13,16 @@ exports.registerUser = async (req, res) => {
     }
 
     // --- Email domain validation ---
-    if (!email.toLowerCase().endsWith('@gectcr.ac.in')) {
-      return res.status(400).json({ message: 'Email must be a valid @gectcr.ac.in address' });
+    const emailLower = email.toLowerCase();
+    const allowedDomains = ['@gectcr.ac.in', '@rit.ac.in'];
+    if (!allowedDomains.some(d => emailLower.endsWith(d))) {
+      return res.status(400).json({ message: 'Email must end with @gectcr.ac.in or @rit.ac.in' });
+    }
+
+    // --- Roll number range validation (1–60 or -1 to -60) ---
+    const roll = Number(rollNumber);
+    if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
+      return res.status(400).json({ message: 'Roll number must be between 1–60 or -1 to -60' });
     }
 
     // --- Check for existing roll number ---
@@ -43,7 +51,7 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'This email is already registered with a different roll number' });
     }
 
-    const user = await User.create({ name, rollNumber, email: email.toLowerCase() });
+    const user = await User.create({ name, rollNumber, email: emailLower });
 
     res.status(201).json({
       _id: user._id,

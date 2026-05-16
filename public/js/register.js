@@ -78,9 +78,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         errorMsg.classList.add('hidden');
 
-        // --- Instant email domain check (before hitting the server) ---
-        if (!email.toLowerCase().endsWith('@gectcr.ac.in')) {
-            errorMsg.textContent = 'Email must end with @gectcr.ac.in)';
+        // --- Roll number validation (1–60 or -1 to -60) ---
+        const roll = Number(rollNumber);
+        if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
+            errorMsg.textContent = 'Roll number must be between 1–60 or -1 to -60';
+            errorMsg.classList.remove('hidden');
+            return;
+        }
+
+        // --- Email domain check ---
+        const emailLower = email.toLowerCase();
+        const validDomains = ['@gectcr.ac.in', '@rit.ac.in'];
+        if (!validDomains.some(d => emailLower.endsWith(d))) {
+            errorMsg.textContent = 'Email must end with @gectcr.ac.in or @rit.ac.in';
             errorMsg.classList.remove('hidden');
             return;
         }
