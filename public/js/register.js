@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // --- Roll number validation (1–60 or -1 to -60) ---
         const roll = Number(rollNumber);
         if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
-            errorMsg.textContent = 'Roll number must be between 1–60 or -1 to -60';
+            errorMsg.textContent = 'Roll number must be between 1–60';
             errorMsg.classList.remove('hidden');
             return;
         }

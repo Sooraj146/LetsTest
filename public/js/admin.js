@@ -606,80 +606,155 @@ function downloadPDF() {
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape', 'mm', 'a4');
+    const pageW = doc.internal.pageSize.width;   // 297 mm
+    const pageH = doc.internal.pageSize.height;  // 210 mm
+    const margin = 14;
 
-    // --- Dynamically extract all section names from actual data ---
+    // ── Dynamically extract section names ────────────────────────────
     const sectionSet = new Set();
     allLeaderboard.forEach(u => Object.keys(u.sectionScores || {}).forEach(s => sectionSet.add(s)));
     const sections = [...sectionSet];
+    const totalQ = totalQuestionsGlobal > 0 ? totalQuestionsGlobal : 30;
 
-    // Short labels for headers (keeps the PDF compact)
-    const shortLabel = s => s
-        .replace('Age Calculation', 'Age Calc')
-        .replace('Profit & Loss', 'P&L')
-        .replace('Time & Work', 'T&W')
-        .replace('Number Series', 'Num Series');
+    // Truncate long section names for compact headers
+    const shortLabel = s => s.length > 12 ? s.substring(0, 11) + '.' : s;
+
+    // ── Header block ───────────────────────────────────────
+    // Blue accent bar at top
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, pageW, 10, 'F');
 
     // Title
-    doc.setFontSize(20);
-    doc.setTextColor(30, 41, 59);
-    doc.text('MCA Test - Student Progress Report', 14, 18);
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont(undefined, 'bold');
+    doc.text('MCA Test  |  Student Results Report', margin, 7);
+    doc.setFont(undefined, 'normal');
 
-    // Subtitle
-    doc.setFontSize(10);
+    // Metadata line
+    doc.setFontSize(8.5);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
-    doc.text(`Total Students: ${allLeaderboard.length}`, 14, 32);
+    const dateStr = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    doc.text(`Generated: ${dateStr}     |     Total Students: ${allLeaderboard.length}     |     Total Questions: ${totalQ}`, margin, 17);
 
-    const totalQ = totalQuestionsGlobal > 0 ? totalQuestionsGlobal : 30;
-    // Build rows — section columns are fully dynamic
-    const rows = allLeaderboard.map(u => [
-        u.rank,
+    // Thin separator
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.4);
+    doc.line(margin, 19, pageW - margin, 19);
+
+    // ── Summary stat boxes ──────────────────────────────────
+    const scores = allLeaderboard.map(u => u.totalScore);
+    const avg    = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+    const high   = Math.max(...scores);
+    const low    = Math.min(...scores);
+    const pass   = scores.filter(s => s >= Math.ceil(totalQ / 2)).length;
+
+    const stats = [
+        { label: 'Highest',  value: high },
+        { label: 'Lowest',   value: low  },
+        { label: 'Average',  value: avg  },
+        { label: 'Passed (>=50%)', value: `${pass} / ${allLeaderboard.length}` },
+    ];
+    const boxW = 50; const boxH = 11; const boxY = 22;
+    stats.forEach((s, i) => {
+        const bx = margin + i * (boxW + 4);
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(bx, boxY, boxW, boxH, 2, 2, 'FD');
+        doc.setFontSize(7); doc.setTextColor(100, 116, 139);
+        doc.text(s.label, bx + 3, boxY + 4);
+        doc.setFontSize(11); doc.setTextColor(30, 41, 59); doc.setFont(undefined, 'bold');
+        doc.text(String(s.value), bx + 3, boxY + 9.5);
+        doc.setFont(undefined, 'normal');
+    });
+
+    // ── Column widths ──────────────────────────────────────────
+    const usableW    = pageW - margin * 2;   // 269 mm
+    const rankW      = 12;
+    const rollW      = 24;
+    const totalColW  = 20;
+    const nameW      = 44;
+    const secW       = sections.length > 0
+        ? Math.floor((usableW - rankW - nameW - rollW - totalColW) / sections.length)
+        : 30;
+
+    const columnStyles = {
+        0: { cellWidth: rankW,     halign: 'center' },
+        1: { cellWidth: nameW,     halign: 'left'   },
+        2: { cellWidth: rollW,     halign: 'center' },
+    };
+    sections.forEach((_, i) => {
+        columnStyles[3 + i] = { cellWidth: secW, halign: 'center' };
+    });
+    columnStyles[3 + sections.length] = { cellWidth: totalColW, halign: 'center' };
+
+    // ── Table data ───────────────────────────────────────────
+    const medals = ['1st', '2nd', '3rd'];
+    const rows = allLeaderboard.map((u, i) => [
+        i < 3 ? medals[i] : `#${u.rank}`,
         u.name,
-        u.rollNumber,
-        ...sections.map(s => u.sectionScores?.[s] ?? '-'),
+        String(u.rollNumber),
+        ...sections.map(s => String(u.sectionScores?.[s] ?? '-')),
         `${u.totalScore}/${totalQ}`,
     ]);
 
-    // Dynamic column widths — fixed cols + equal-width section cols
-    const fixedWidths = { 0: 12, 1: 42, 2: 26 };
-    const lastColWidth = 22;
-    const totalPageWidth = 267; // A4 landscape usable width
-    const usedFixed = fixedWidths[0] + fixedWidths[1] + fixedWidths[2] + lastColWidth;
-    const sectionColWidth = sections.length > 0
-        ? Math.floor((totalPageWidth - usedFixed) / sections.length)
-        : 20;
-
-    const columnStyles = {
-        0: { cellWidth: fixedWidths[0], halign: 'center' },
-        1: { cellWidth: fixedWidths[1] },
-        2: { cellWidth: fixedWidths[2] },
-    };
-    sections.forEach((_, i) => {
-        columnStyles[3 + i] = { cellWidth: sectionColWidth, halign: 'center' };
-    });
-    columnStyles[3 + sections.length] = { cellWidth: lastColWidth, halign: 'center' };
-
+    // ── autoTable ───────────────────────────────────────────
     doc.autoTable({
         head: [['Rank', 'Name', 'Roll No', ...sections.map(shortLabel), 'Total']],
         body: rows,
-        startY: 38,
-        styles: { fontSize: 9, cellPadding: 3, textColor: [30, 41, 59] },
-        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold', fontSize: 9 },
-        alternateRowStyles: { fillColor: [241, 245, 249] },
+        startY: 36,
+        margin: { left: margin, right: margin },
+        tableWidth: 'auto',
+        styles: {
+            fontSize:    8.5,
+            cellPadding: { top: 2.5, right: 3, bottom: 2.5, left: 3 },
+            textColor:   [30, 41, 59],
+            lineColor:   [203, 213, 225],   // light grey cell borders
+            lineWidth:   0.25,              // draw ALL cell borders
+            valign:      'middle',
+            overflow:    'ellipsize',
+        },
+        headStyles: {
+            fillColor:   [37, 99, 235],     // blue
+            textColor:   [255, 255, 255],
+            fontStyle:   'bold',
+            fontSize:    8.5,
+            lineColor:   [29, 78, 216],
+            lineWidth:   0.3,
+            halign:      'center',
+        },
+        alternateRowStyles: {
+            fillColor: [248, 250, 252],     // very light blue-grey
+        },
+        // Highlight top 3
+        didParseCell: (data) => {
+            if (data.section === 'body' && data.row.index < 3) {
+                data.cell.styles.fontStyle  = 'bold';
+                data.cell.styles.textColor  = [30, 64, 175];  // blue text for top 3
+            }
+            // Bold + green for the Total column
+            if (data.section === 'body' && data.column.index === 3 + sections.length) {
+                data.cell.styles.fontStyle  = 'bold';
+                data.cell.styles.textColor  = [21, 128, 61];
+            }
+        },
         columnStyles,
     });
 
-    // Footer on every page
+    // ── Footer on every page ───────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`MCA Test — Confidential | Page ${i} of ${pageCount}`, 14, doc.internal.pageSize.height - 8);
+        doc.setFillColor(37, 99, 235);
+        doc.rect(0, pageH - 8, pageW, 8, 'F');
+        doc.setFontSize(7.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`MCA Test  |  Confidential`, margin, pageH - 3);
+        doc.text(`Page ${i} of ${pageCount}`, pageW - margin, pageH - 3, { align: 'right' });
     }
 
-    const dateStr = new Date().toISOString().split('T')[0];
-    doc.save(`MCA_Test_Results_${dateStr}.pdf`);
+    doc.save(`MCA_Test_Results_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 // ----------------------------------------------------------------

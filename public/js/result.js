@@ -177,10 +177,11 @@ async function downloadAnswerKey() {
                     y += optH;
                 });
 
-                // Correct answer label
+                // Correct answer label — use plain ASCII, jsPDF standard font
+                // doesn't support Unicode symbols (★ renders as spaced garbage)
                 doc.setFont(undefined, 'bold');
                 doc.setTextColor(22, 101, 52);
-                const ansLabel = `★ Correct: ${q.correctAnswer}`;
+                const ansLabel = `[ANS] ${q.correctAnswer}`;
                 const ansLines = doc.splitTextToSize(ansLabel, colW - 10);
                 doc.text(ansLines, margin + 4, y);
                 doc.setFont(undefined, 'normal');

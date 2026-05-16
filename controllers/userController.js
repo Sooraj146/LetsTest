@@ -22,7 +22,7 @@ exports.registerUser = async (req, res) => {
     // --- Roll number range validation (1–60 or -1 to -60) ---
     const roll = Number(rollNumber);
     if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
-      return res.status(400).json({ message: 'Roll number must be between 1–60 or -1 to -60' });
+      return res.status(400).json({ message: 'Roll number must be between 1–60' });
     }
 
     // --- Check for existing roll number ---
