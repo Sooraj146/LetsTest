@@ -10,11 +10,7 @@ const examSchema = new mongoose.Schema({
   // e.g. ['@gectcr.ac.in'] or ['@rit.ac.in'] or both
   targetColleges: {
     type: [String],
-    required: true,
-    validate: {
-      validator: v => Array.isArray(v) && v.length > 0,
-      message: 'At least one target college is required',
-    },
+    default: [],
   },
   startTime: {
     type: Date,

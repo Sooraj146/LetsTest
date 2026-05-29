@@ -10,6 +10,9 @@ const {
   clearAllUsers,
   clearAllQuestions,
   bulkAddQuestions,
+  getStudents,
+  addStudent,
+  deleteStudent,
 } = require('../controllers/adminController');
 const {
   createExam,
@@ -19,6 +22,11 @@ const {
 
 const router = express.Router();
 router.use(adminAuth);
+
+// ── Student management ─────────────────────────────────────────────
+router.get('/students',     getStudents);
+router.post('/students',    addStudent);
+router.delete('/students/:id', deleteStudent);
 
 // ── Exam management ────────────────────────────────────────────────
 router.post('/exams',      createExam);

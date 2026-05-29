@@ -1,5 +1,47 @@
 const User = require('../models/User');
 const Question = require('../models/Question');
+const Student = require('../models/Student');
+
+// @desc  Get all pre-populated students
+// @route GET /api/admin/students
+exports.getStudents = async (req, res) => {
+  try {
+    const students = await Student.find().sort({ rollNumber: 1 });
+    res.status(200).json(students);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Add a student
+// @route POST /api/admin/students
+exports.addStudent = async (req, res) => {
+  try {
+    const { name, rollNumber } = req.body;
+    if (!name || rollNumber === undefined) {
+      return res.status(400).json({ message: 'Name and roll number are required' });
+    }
+    const student = await Student.create({ name, rollNumber });
+    res.status(201).json(student);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Roll number already exists' });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Delete a student
+// @route DELETE /api/admin/students/:id
+exports.deleteStudent = async (req, res) => {
+  try {
+    const student = await Student.findByIdAndDelete(req.params.id);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+    res.status(200).json({ message: 'Student deleted' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // Helper — require examId query param
 function requireExamId(req, res) {

@@ -1,16 +1,73 @@
 const User = require('../models/User');
 const Question = require('../models/Question');
 const Exam = require('../models/Exam');
+const Student = require('../models/Student');
+
+// @desc    Get student name by roll number
+// @route   GET /api/users/student/:rollNumber
+exports.getStudentByRoll = async (req, res) => {
+  try {
+    let roll = Number(req.params.rollNumber);
+    if (isNaN(roll)) return res.status(400).json({ message: 'Invalid roll number' });
+
+    // Negative roll number logic: absolute value represents the name
+    const absRoll = Math.abs(roll);
+    const student = await Student.findOne({ rollNumber: absRoll });
+
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+    res.status(200).json(student);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get all exams categorized by status
+// @route   GET /api/users/exams
+exports.getExams = async (req, res) => {
+  try {
+    const exams = await Exam.find().sort({ startTime: -1 });
+    const now = new Date();
+
+    const result = {
+      past: [],
+      current: [],
+      upcoming: [],
+    };
+
+    exams.forEach(exam => {
+      if (exam.endTime && now > exam.endTime) {
+        result.past.push(exam);
+      } else if (exam.startTime && now < exam.startTime) {
+        result.upcoming.push(exam);
+      } else {
+        result.current.push(exam);
+      }
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // @desc    Register a student for a specific exam
 // @route   POST /api/users/register
 exports.registerUser = async (req, res) => {
   try {
-    const { name, rollNumber, email, examId } = req.body;
+    const { rollNumber, email, examId } = req.body;
 
-    if (!name || !rollNumber || !email || !examId) {
-      return res.status(400).json({ message: 'Please provide all fields including examId' });
+    if (!rollNumber || !email || !examId) {
+      return res.status(400).json({ message: 'Please provide roll number, email and examId' });
     }
+
+    // --- Fetch name from Student master list ---
+    const roll = Number(rollNumber);
+    const absRoll = Math.abs(roll);
+    const student = await Student.findOne({ rollNumber: absRoll });
+    if (!student) {
+      return res.status(404).json({ message: 'Student roll number not found in master list' });
+    }
+    const name = student.name;
 
     // --- Load exam ---
     const exam = await Exam.findById(examId);
@@ -18,24 +75,7 @@ exports.registerUser = async (req, res) => {
 
     // --- Email domain validation ---
     const emailLower = email.toLowerCase();
-    const allowedDomains = ['@gectcr.ac.in', '@rit.ac.in'];
-    if (!allowedDomains.some(d => emailLower.endsWith(d))) {
-      return res.status(400).json({ message: 'Email must end with @gectcr.ac.in or @rit.ac.in' });
-    }
-
-    // --- Check email domain matches exam's target colleges ---
-    const emailDomain = '@' + emailLower.split('@')[1];
-    if (!exam.targetColleges.includes(emailDomain)) {
-      return res.status(403).json({
-        message: `This exam is not available for ${emailDomain} students`,
-      });
-    }
-
-    // --- Roll number range validation (1–60 or -1 to -60) ---
-    const roll = Number(rollNumber);
-    if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
-      return res.status(400).json({ message: 'Roll number must be between 1–60' });
-    }
+    // (Removed domain restrictions as requested)
 
     // --- Check for existing registration for THIS exam ---
     const byRoll = await User.findOne({ rollNumber, examId });

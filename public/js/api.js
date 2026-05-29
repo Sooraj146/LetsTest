@@ -45,6 +45,13 @@ const api = {
       body:    JSON.stringify({ rollNumber, email }),
     }).then(r => r.json()),
 
+  getStudentName: (rollNumber) =>
+    fetch(`/api/users/student/${rollNumber}`).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || 'Student not found');
+      return data;
+    }),
+
   // ── Questions ──────────────────────────────────────────────────────
   getQuestions: (examId) =>
     fetch(`/api/questions?examId=${examId}`).then(r => r.json()),

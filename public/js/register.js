@@ -36,6 +36,34 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Details form submit ───────────────────────────────────────────────
+let nameFetchTimeout = null;
+async function fetchNameByRoll(rollNumber) {
+    if (!rollNumber) {
+        document.getElementById('name').value = '';
+        return;
+    }
+
+    clearTimeout(nameFetchTimeout);
+    nameFetchTimeout = setTimeout(async () => {
+        const nameInput = document.getElementById('name');
+        const loading = document.getElementById('nameLoading');
+        const errEl = document.getElementById('detailsError');
+
+        loading.classList.remove('hidden');
+        hideError(errEl);
+
+        try {
+            const student = await api.getStudentName(rollNumber);
+            nameInput.value = student.name;
+        } catch (err) {
+            nameInput.value = '';
+            showError(errEl, 'Student with this roll number not found.');
+        } finally {
+            loading.classList.add('hidden');
+        }
+    }, 500);
+}
+
 detailsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideError(detailsError);
@@ -44,17 +72,15 @@ detailsForm.addEventListener('submit', async (e) => {
     const rollNumber = document.getElementById('rollNumber').value.trim();
     const email      = document.getElementById('email').value.trim();
 
-    // Client-side validation
-    const roll = Number(rollNumber);
-    if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
-        return showError(detailsError, 'Roll number must be between 1–60');
+    if (!name) {
+        return showError(detailsError, 'Please enter a valid roll number to fetch your name.');
     }
 
-    const emailLower   = email.toLowerCase();
-    const validDomains = ['@gectcr.ac.in', '@rit.ac.in'];
-    if (!validDomains.some(d => emailLower.endsWith(d))) {
-        return showError(detailsError, 'Email must end with @gectcr.ac.in or @rit.ac.in');
+    if (!email) {
+        return showError(detailsError, 'Please enter your email address.');
     }
+
+    const emailLower = email.toLowerCase();
 
     // Loading state
     continueBtn.disabled = true;
@@ -64,7 +90,7 @@ detailsForm.addEventListener('submit', async (e) => {
     sessionStorage.setItem('studentInfo', JSON.stringify(studentInfo));
 
     continueBtn.disabled = false;
-    continueBtn.innerHTML = `<span>View Available Exams</span><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`;
+    continueBtn.innerHTML = `<span>View Exams</span><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`;
 
     showExamDashboard();
 });
@@ -84,14 +110,14 @@ async function showExamDashboard() {
     timers = {};
 
     // Render loading skeletons
-    const list = document.getElementById('examList');
-    list.innerHTML = `
-        ${[1,2].map(() => `
-        <div class="glass-panel rounded-2xl p-5 animate-pulse">
-            <div class="h-4 bg-dark-700 rounded w-1/3 mb-3"></div>
-            <div class="h-6 bg-dark-700 rounded w-2/3 mb-2"></div>
-            <div class="h-3 bg-dark-700 rounded w-1/2"></div>
-        </div>`).join('')}`;
+    const sections = ['Current', 'Upcoming', 'Past'];
+    sections.forEach(s => {
+        document.getElementById(`list${s}`).innerHTML = `
+            <div class="glass-panel rounded-2xl p-5 animate-pulse">
+                <div class="h-4 bg-dark-700 rounded w-1/3 mb-3"></div>
+                <div class="h-6 bg-dark-700 rounded w-2/3 mb-2"></div>
+            </div>`;
+    });
 
     try {
         const [allExams, myExams] = await Promise.all([
@@ -99,12 +125,8 @@ async function showExamDashboard() {
             api.getMyExams({ rollNumber: studentInfo.rollNumber, email: studentInfo.email }),
         ]);
 
-        // Filter exams by student's college domain
-        const emailDomain = '@' + studentInfo.email.split('@')[1];
-        const myExamsList = allExams.filter(e => e.targetColleges.includes(emailDomain));
-
-        if (myExamsList.length === 0) {
-            list.innerHTML = '';
+        if (allExams.length === 0) {
+            sections.forEach(s => document.getElementById(`list${s}`).innerHTML = '');
             document.getElementById('examEmpty').classList.remove('hidden');
             return;
         }
@@ -117,7 +139,7 @@ async function showExamDashboard() {
         const upcoming  = [];
         const past      = [];
 
-        myExamsList.forEach(exam => {
+        allExams.forEach(exam => {
             const start  = exam.startTime ? new Date(exam.startTime) : null;
             const end    = exam.endTime   ? new Date(exam.endTime)   : null;
             const done   = myExams[exam._id]?.isSubmitted || false;
@@ -131,24 +153,30 @@ async function showExamDashboard() {
             }
         });
 
-        // Sort: active first, then upcoming, then past
-        list.innerHTML = '';
-
-        const renderSection = (label, color, items) => {
-            if (!items.length) return;
-            const heading = document.createElement('p');
-            heading.className = `text-xs uppercase tracking-widest font-semibold text-${color}-400 mt-2 mb-1 px-1`;
-            heading.textContent = label;
-            list.appendChild(heading);
-            items.forEach(item => list.appendChild(buildExamCard(item)));
+        const renderItems = (items, containerId, sectionId) => {
+            const container = document.getElementById(containerId);
+            const section = document.getElementById(sectionId);
+            if (!items.length) {
+                section.classList.add('hidden');
+                container.innerHTML = '';
+                return;
+            }
+            section.classList.remove('hidden');
+            container.innerHTML = '';
+            items.forEach(item => container.appendChild(buildExamCard(item)));
         };
 
-        renderSection('Active Now',   'emerald', active);
-        renderSection('Upcoming',     'yellow',  upcoming);
-        renderSection('Past Exams',   'slate',   past);
+        renderItems(active,   'listCurrent',  'sectionCurrent');
+        renderItems(upcoming, 'listUpcoming', 'sectionUpcoming');
+        renderItems(past,     'listPast',     'sectionPast');
+
+        if (!active.length && !upcoming.length && !past.length) {
+            document.getElementById('examEmpty').classList.remove('hidden');
+        }
 
     } catch (err) {
-        list.innerHTML = `<div class="glass-panel rounded-2xl p-6 text-center text-red-400">Failed to load exams: ${err.message}</div>`;
+        document.getElementById('examEmpty').innerHTML = `<p class="text-red-400">Failed to load exams: ${err.message}</p>`;
+        document.getElementById('examEmpty').classList.remove('hidden');
     }
 }
 
@@ -176,11 +204,6 @@ function buildExamCard({ exam, done, submission }) {
     } else {
         badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-slate-500/10 border border-slate-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-slate-400"></span>Ended</span>`;
     }
-
-    // College tags
-    const collegeTags = exam.targetColleges.map(c =>
-        `<span class="text-xs text-slate-500 bg-dark-700 px-2 py-0.5 rounded-md">${c.replace('@','')}</span>`
-    ).join('');
 
     // Score if done
     const scoreHTML = done && submission
@@ -213,11 +236,10 @@ function buildExamCard({ exam, done, submission }) {
     }
 
     card.innerHTML = `
-        <div class="flex items-start justify-between gap-3 mb-3">
+        <div class="flex items-start justify-between gap-3 mb-1">
             <div class="flex-1 min-w-0">
                 ${badgeHTML}
                 <h2 class="text-base font-semibold text-white mt-2 leading-snug">${escHtml(exam.title)}</h2>
-                <div class="flex flex-wrap gap-1.5 mt-1.5">${collegeTags}</div>
                 ${timerCaption}
             </div>
             <div class="flex flex-col items-end gap-2 flex-shrink-0">

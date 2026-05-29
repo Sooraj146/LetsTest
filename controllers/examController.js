@@ -28,15 +28,15 @@ exports.getExam = async (req, res) => {
 exports.createExam = async (req, res) => {
   try {
     const { title, targetColleges, startTime, endTime } = req.body;
-    if (!title || !targetColleges || targetColleges.length === 0) {
-      return res.status(400).json({ message: 'Title and at least one target college are required' });
+    if (!title) {
+      return res.status(400).json({ message: 'Title is required' });
     }
     if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
       return res.status(400).json({ message: 'End time must be after start time' });
     }
     const exam = await Exam.create({
       title,
-      targetColleges,
+      targetColleges: targetColleges || [],
       startTime: startTime || null,
       endTime:   endTime   || null,
     });
@@ -54,14 +54,17 @@ exports.updateExam = async (req, res) => {
     if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
       return res.status(400).json({ message: 'End time must be after start time' });
     }
+
+    const updateData = {
+      startTime: startTime || null,
+      endTime:   endTime   || null,
+    };
+    if (title) updateData.title = title;
+    if (targetColleges) updateData.targetColleges = targetColleges;
+
     const exam = await Exam.findByIdAndUpdate(
       req.params.id,
-      {
-        title,
-        targetColleges,
-        startTime: startTime || null,
-        endTime:   endTime   || null,
-      },
+      updateData,
       { new: true, runValidators: true }
     );
     if (!exam) return res.status(404).json({ message: 'Exam not found' });

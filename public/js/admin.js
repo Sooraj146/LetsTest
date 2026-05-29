@@ -102,19 +102,108 @@ function adminLogout() {
 // ----------------------------------------------------------------
 let analyticsLoaded = false;
 let questionsLoaded = false;
+let studentsLoaded = false;
 
 function switchTab(tab) {
-    ['leaderboard', 'analytics', 'questions', 'settings'].forEach(t => {
-        document.getElementById(`tab-${t}`).classList.add('hidden');
+    ['leaderboard', 'analytics', 'questions', 'students', 'settings'].forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        if (el) el.classList.add('hidden');
     });
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active-tab'));
-    document.querySelector(`[data-tab="${tab}"]`).classList.add('active-tab');
-    document.getElementById(`tab-${tab}`).classList.remove('hidden');
+    const btn = document.querySelector(`[data-tab="${tab}"]`);
+    if (btn) btn.classList.add('active-tab');
+    const tabEl = document.getElementById(`tab-${tab}`);
+    if (tabEl) tabEl.classList.remove('hidden');
 
     // Reset loaded flags when switching exams
     if (tab === 'analytics' && !analyticsLoaded) { loadAnalytics(); analyticsLoaded = true; }
     if (tab === 'questions' && !questionsLoaded)  { loadAdminQuestions(); questionsLoaded = true; }
+    if (tab === 'students' && !studentsLoaded)   { loadStudents(); studentsLoaded = true; }
     if (tab === 'settings') { renderExamSettingsTab(); }
+}
+
+// ----------------------------------------------------------------
+// STUDENT MANAGEMENT
+// ----------------------------------------------------------------
+let allStudents = [];
+
+async function loadStudents() {
+    const res = await adminFetch('/api/admin/students');
+    if (res.ok) {
+        allStudents = await res.json();
+        renderStudents();
+    }
+}
+
+function renderStudents() {
+    const tbody = document.getElementById('studentsTableBody');
+    if (!allStudents.length) {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-10 text-slate-500">No students added yet.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = allStudents.map(s => `
+        <tr class="hover:bg-dark-800/50 transition-colors">
+            <td class="px-4 py-3 text-slate-400 font-mono text-xs">${s.rollNumber}</td>
+            <td class="px-4 py-3 font-medium text-white">${s.name}</td>
+            <td class="px-4 py-3 text-right">
+                <button onclick="deleteStudent('${s._id}')" class="p-1.5 rounded-lg border border-red-500/30 hover:bg-red-500/20 text-red-400 transition-colors" title="Delete">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openAddStudentModal() {
+    document.getElementById('newStudentRoll').value = '';
+    document.getElementById('newStudentName').value = '';
+    document.getElementById('addStudentError').classList.add('hidden');
+    const modal = document.getElementById('addStudentModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeAddStudentModal() {
+    const modal = document.getElementById('addStudentModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function confirmAddStudent() {
+    const roll = document.getElementById('newStudentRoll').value;
+    const name = document.getElementById('newStudentName').value.trim();
+    const errEl = document.getElementById('addStudentError');
+
+    if (!roll || !name) {
+        errEl.textContent = 'Roll number and name are required.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const res = await adminFetch('/api/admin/students', {
+        method: 'POST',
+        body: JSON.stringify({ rollNumber: Number(roll), name })
+    });
+
+    if (res.ok) {
+        closeAddStudentModal();
+        await loadStudents();
+    } else {
+        const data = await res.json();
+        errEl.textContent = data.message || 'Failed to add student.';
+        errEl.classList.remove('hidden');
+    }
+}
+
+async function deleteStudent(id) {
+    if (!confirm('Are you sure you want to delete this student?')) return;
+    const res = await adminFetch(`/api/admin/students/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+        await loadStudents();
+    } else {
+        alert('Failed to delete student.');
+    }
 }
 
 // ----------------------------------------------------------------
@@ -883,10 +972,6 @@ function renderExamSettingsTab() {
     document.getElementById('timerStart').value = toLocal(exam.startTime);
     document.getElementById('timerEnd').value   = toLocal(exam.endTime);
     document.getElementById('examTitleInput').value = exam.title;
-
-    // Checkboxes
-    document.getElementById('chkGEC').checked = exam.targetColleges.includes('@gectcr.ac.in');
-    document.getElementById('chkRIT').checked = exam.targetColleges.includes('@rit.ac.in');
 }
 
 async function saveExamSettings() {
@@ -899,16 +984,8 @@ async function saveExamSettings() {
     errEl.classList.add('hidden');
     succEl.classList.add('hidden');
 
-    const colleges = [];
-    if (document.getElementById('chkGEC').checked) colleges.push('@gectcr.ac.in');
-    if (document.getElementById('chkRIT').checked) colleges.push('@rit.ac.in');
-
     if (!title) {
         errEl.textContent = 'Exam title is required.';
-        errEl.classList.remove('hidden'); return;
-    }
-    if (colleges.length === 0) {
-        errEl.textContent = 'At least one college must be selected.';
         errEl.classList.remove('hidden'); return;
     }
 
@@ -925,7 +1002,7 @@ async function saveExamSettings() {
 
     const res = await adminFetch(`/api/admin/exams/${selectedExamId}`, {
         method: 'PUT',
-        body: JSON.stringify({ title, targetColleges: colleges, startTime, endTime }),
+        body: JSON.stringify({ title, startTime, endTime }),
     });
 
     btn.disabled = false; btn.textContent = 'Save Exam Settings';
@@ -948,8 +1025,6 @@ async function saveExamSettings() {
 // ── Create new exam modal ─────────────────────────────────────────
 function openCreateExamModal() {
     document.getElementById('newExamTitle').value = '';
-    document.getElementById('newChkGEC').checked  = true;
-    document.getElementById('newChkRIT').checked  = false;
     document.getElementById('newExamStart').value = '';
     document.getElementById('newExamEnd').value   = '';
     document.getElementById('createExamError').classList.add('hidden');
@@ -969,12 +1044,7 @@ async function confirmCreateExam() {
     const errEl    = document.getElementById('createExamError');
     errEl.classList.add('hidden');
 
-    const colleges = [];
-    if (document.getElementById('newChkGEC').checked) colleges.push('@gectcr.ac.in');
-    if (document.getElementById('newChkRIT').checked) colleges.push('@rit.ac.in');
-
     if (!title) { errEl.textContent = 'Title is required.'; errEl.classList.remove('hidden'); return; }
-    if (!colleges.length) { errEl.textContent = 'Select at least one college.'; errEl.classList.remove('hidden'); return; }
 
     const btn = document.getElementById('createExamBtn');
     btn.disabled = true; btn.textContent = 'Creating...';
@@ -983,7 +1053,6 @@ async function confirmCreateExam() {
         method: 'POST',
         body: JSON.stringify({
             title,
-            targetColleges: colleges,
             startTime: startVal ? new Date(startVal).toISOString() : null,
             endTime:   endVal   ? new Date(endVal).toISOString()   : null,
         }),
