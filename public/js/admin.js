@@ -407,26 +407,38 @@ async function loadExamsGrid() {
 }
 
 function openExamModal(id = null) {
-    const exam = id ? window.allExams.find(e => e._id === id) : { title: '', startTime: '', endTime: '' };
+    const exam = id ? window.allExams.find(e => e._id === id) : { title: '', startTime: '', endTime: '', collegeId: selectedCollegeId };
     const fmt = (d) => d ? new Date(d).toISOString().slice(0, 16) : '';
     setModalTitle(id ? 'Refine Assessment' : 'Launch New Assessment');
     
-    let collegeSelection = '';
-    if (!id && currentAdmin.role === 'main') {
-        collegeSelection = `
-            <div>
-                <label class="block text-sm font-semibold text-slate-400 mb-3">Distribute to Institutions</label>
-                <div class="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto custom-scrollbar p-1">
-                    ${colleges.map(c => `
-                        <label class="flex items-center gap-3 p-3 glass rounded-xl cursor-pointer hover:border-primary-500/50 transition-all">
-                            <input type="checkbox" name="collegeIds" value="${c._id}" checked class="w-5 h-5 rounded-lg accent-primary-500">
-                            <span class="text-sm font-medium text-slate-300 truncate">${c.name}</span>
-                        </label>
-                    `).join('')}
+    let collegeSection = '';
+    if (currentAdmin.role === 'main') {
+        if (!id) {
+            // Creation mode: Multi-select
+            collegeSection = `
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-3">Distribute to Institutions</label>
+                    <div class="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                        ${colleges.map(c => `
+                            <label class="flex items-center gap-3 p-3 glass rounded-xl cursor-pointer hover:border-primary-500/50 transition-all">
+                                <input type="checkbox" name="collegeIds" value="${c._id}" checked class="w-5 h-5 rounded-lg accent-primary-500">
+                                <span class="text-sm font-medium text-slate-300 truncate">${c.name}</span>
+                            </label>
+                        `).join('')}
+                    </div>
                 </div>
-                <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">Separate exams will be created for each selection</p>
-            </div>
-        `;
+            `;
+        } else {
+            // Edit mode: Change single college for this specific exam instance
+            collegeSection = `
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Relocate to Institution</label>
+                    <select name="collegeId" class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white focus:ring-2 focus:ring-primary-500 appearance-none">
+                        ${colleges.map(c => `<option value="${c._id}" ${c._id === exam.collegeId ? 'selected' : ''}>${c.name}</option>`).join('')}
+                    </select>
+                </div>
+            `;
+        }
     }
 
     showModal(`
@@ -435,7 +447,7 @@ function openExamModal(id = null) {
                 <label class="block text-sm font-semibold text-slate-400 mb-2">Assessment Title</label>
                 <input type="text" name="title" value="${exam.title}" required placeholder="e.g. End Semester Aptitude 2026" class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-primary-500 outline-none text-white transition-all">
             </div>
-            ${collegeSelection}
+            ${collegeSection}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block text-sm font-semibold text-slate-400 mb-2">Activation Window</label>
@@ -448,7 +460,7 @@ function openExamModal(id = null) {
             </div>
             <div class="flex gap-4 pt-6">
                 <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 hover:bg-white/10 text-slate-300 rounded-2xl font-bold">Discard</button>
-                <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Launch Exam</button>
+                <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Save Assessment</button>
             </div>
         </form>
     `);
@@ -456,7 +468,6 @@ function openExamModal(id = null) {
 
 async function saveExam(e, id) {
     e.preventDefault();
-    const collegeIds = Array.from(e.target.querySelectorAll('input[name="collegeIds"]:checked')).map(i => i.value);
     const body = { 
         title: e.target.title.value, 
         startTime: e.target.startTime.value || null,
@@ -464,19 +475,26 @@ async function saveExam(e, id) {
     };
     
     if (id) {
-        body.collegeId = selectedCollegeId;
-    } else if (currentAdmin.role === 'main') {
-        body.collegeIds = collegeIds;
-        if (collegeIds.length === 0) return alert('Select at least one college');
+        if (currentAdmin.role === 'main') {
+            body.collegeId = e.target.collegeId.value;
+        } else {
+            body.collegeId = selectedCollegeId;
+        }
     } else {
-        body.collegeId = currentAdmin.college?._id;
+        if (currentAdmin.role === 'main') {
+            const collegeIds = Array.from(e.target.querySelectorAll('input[name="collegeIds"]:checked')).map(i => i.value);
+            if (collegeIds.length === 0) return alert('Select at least one college');
+            body.collegeIds = collegeIds;
+        } else {
+            body.collegeId = currentAdmin.college?._id;
+        }
     }
 
     try {
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/admin/exams/${id}` : '/api/admin/exams';
         const res = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(body) });
-        if (!res.ok) throw new Error('Exam creation failed');
+        if (!res.ok) throw new Error('Exam sync failed');
         closeModal();
         loadExamsGrid();
     } catch (err) {
@@ -566,43 +584,6 @@ async function saveStudent(e) {
     }
 }
 
-function openBulkStudentModal() {
-    setModalTitle('Students Bulk Sync');
-    showModal(`
-        <div class="space-y-6">
-            <div class="p-6 bg-primary-500/5 border border-primary-500/10 rounded-2xl">
-                <p class="text-xs text-slate-400 uppercase tracking-widest font-bold mb-4">Required Data Structure (JSON)</p>
-                <code class="text-[10px] text-primary-400 block whitespace-pre">[\n  { "rollNumber": 101, "name": "John Doe" },\n  { "rollNumber": 102, "name": "Jane Smith" }\n]</code>
-            </div>
-            <form onsubmit="handleBulkStudents(event)" class="space-y-6">
-                <textarea name="jsonContent" required rows="8" placeholder="Paste student array here..." class="w-full px-5 py-4 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white font-mono text-xs focus:ring-2 focus:ring-primary-500"></textarea>
-                <div class="flex gap-4">
-                    <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 text-slate-300 rounded-2xl font-bold">Cancel</button>
-                    <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Start Sync</button>
-                </div>
-            </form>
-        </div>
-    `);
-}
-
-async function handleBulkStudents(e) {
-    e.preventDefault();
-    try {
-        const students = JSON.parse(e.target.jsonContent.value);
-        const res = await fetch('/api/admin/students/bulk', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ collegeId: selectedCollegeId, students })
-        });
-        const data = await res.json();
-        alert(data.message);
-        closeModal();
-        loadStudentsList();
-    } catch (err) {
-        alert('Validation Error: ' + err.message);
-    }
-}
-
 async function deleteStudent(id) {
     if (!confirm('Remove student profile?')) return;
     try {
@@ -612,6 +593,87 @@ async function deleteStudent(id) {
     } catch (err) {
         alert(err.message);
     }
+}
+
+// ── CSV Bulk Uploads ──────────────────────────────────────────────────
+
+function openBulkStudentModal() {
+    setModalTitle('Students Bulk Sync (CSV)');
+    showModal(`
+        <div class="space-y-6 text-center">
+            <div class="p-8 border-2 border-dashed border-slate-800 rounded-[2rem] bg-white/5 group hover:border-primary-500/50 transition-all">
+                <i data-lucide="upload-cloud" class="w-12 h-12 text-slate-600 mx-auto mb-4 group-hover:text-primary-400 transition-all"></i>
+                <h4 class="text-white font-bold mb-2">Upload Student CSV</h4>
+                <p class="text-xs text-slate-500 mb-6">Headers required: <b>rollNumber, name</b></p>
+                <input type="file" id="csvFile" accept=".csv" class="hidden" onchange="handleCSVUpload(this, 'students')">
+                <button onclick="document.getElementById('csvFile').click()" class="px-6 py-2.5 bg-dark-800 text-white rounded-xl text-sm font-bold border border-white/5 hover:bg-dark-700 transition-all">Select File</button>
+            </div>
+            <p class="text-[10px] text-slate-600 uppercase font-black">Duplicates will be skipped automatically</p>
+        </div>
+    `);
+    refreshIcons();
+}
+
+function openBulkModal() {
+    setModalTitle('Questions Bulk Sync (CSV)');
+    showModal(`
+        <div class="space-y-6 text-center">
+            <div class="p-8 border-2 border-dashed border-slate-800 rounded-[2rem] bg-white/5 group hover:border-primary-500/50 transition-all">
+                <i data-lucide="file-up" class="w-12 h-12 text-slate-600 mx-auto mb-4 group-hover:text-primary-400 transition-all"></i>
+                <h4 class="text-white font-bold mb-2">Upload Question CSV</h4>
+                <p class="text-xs text-slate-500 mb-6">Headers: <b>section, questionText, option0, option1, option2, option3, correctAnswer</b></p>
+                <input type="file" id="csvFile" accept=".csv" class="hidden" onchange="handleCSVUpload(this, 'questions')">
+                <button onclick="document.getElementById('csvFile').click()" class="px-6 py-2.5 bg-dark-800 text-white rounded-xl text-sm font-bold border border-white/5 hover:bg-dark-700 transition-all">Select File</button>
+            </div>
+        </div>
+    `);
+    refreshIcons();
+}
+
+function handleCSVUpload(input, type) {
+    const file = input.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async function(results) {
+            let data = results.data;
+            try {
+                if (type === 'students') {
+                    // Normalize rollNumber to integer
+                    data = data.map(s => ({ ...s, rollNumber: parseInt(s.rollNumber) }));
+                    const res = await fetch('/api/admin/students/bulk', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ collegeId: selectedCollegeId, students: data })
+                    });
+                    const resData = await res.json();
+                    alert(resData.message);
+                    loadStudentsList();
+                } else {
+                    // Questions: normalize options and correctAnswer
+                    const questions = data.map(q => ({
+                        section: q.section,
+                        questionText: q.questionText,
+                        options: [q.option0, q.option1, q.option2, q.option3],
+                        correctAnswer: parseInt(q.correctAnswer)
+                    }));
+                    const res = await fetch('/api/admin/questions/bulk', {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ examId: selectedExamId, questions })
+                    });
+                    const resData = await res.json();
+                    alert(resData.message);
+                    loadQuestions();
+                }
+                closeModal();
+            } catch (err) {
+                alert('Upload Error: ' + err.message);
+            }
+        }
+    });
 }
 
 // ── Control Center (Exam Details) ────────────────────────────────────
@@ -814,42 +876,6 @@ async function saveQuestion(e, id) {
         loadQuestions();
     } catch (err) {
         alert(err.message);
-    }
-}
-
-function openBulkModal() {
-    setModalTitle('Content Import (JSON)');
-    showModal(`
-        <div class="space-y-6">
-            <div class="p-6 bg-accent-500/5 border border-accent-500/10 rounded-2xl">
-                <code class="text-[10px] text-accent-400 block whitespace-pre">[\n  {\n    "section": "Verbal",\n    "questionText": "Question here?",\n    "options": ["A", "B", "C", "D"],\n    "correctAnswer": 0\n  }\n]</code>
-            </div>
-            <form onsubmit="handleBulkUpload(event)" class="space-y-6">
-                <textarea name="jsonContent" required rows="10" placeholder="Paste question array..." class="w-full px-5 py-4 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white font-mono text-xs focus:ring-2 focus:ring-primary-500"></textarea>
-                <div class="flex gap-4">
-                    <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 text-slate-300 rounded-2xl font-bold">Cancel</button>
-                    <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Start Import</button>
-                </div>
-            </form>
-        </div>
-    `);
-}
-
-async function handleBulkUpload(e) {
-    e.preventDefault();
-    try {
-        const questions = JSON.parse(e.target.jsonContent.value);
-        const res = await fetch('/api/admin/questions/bulk', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ examId: selectedExamId, questions })
-        });
-        const data = await res.json();
-        alert(data.message);
-        closeModal();
-        loadQuestions();
-    } catch (err) {
-        alert('Parsing Error: ' + err.message);
     }
 }
 

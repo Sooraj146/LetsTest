@@ -76,7 +76,7 @@ exports.createExam = async (req, res) => {
 // @route PUT /api/admin/exams/:id
 exports.updateExam = async (req, res) => {
   try {
-    const { title, startTime, endTime } = req.body;
+    const { title, startTime, endTime, collegeId } = req.body;
     if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
       return res.status(400).json({ message: 'End time must be after start time' });
     }
@@ -86,6 +86,11 @@ exports.updateExam = async (req, res) => {
       endTime:   endTime   || null,
     };
     if (title) updateData.title = title;
+    
+    // Allow Main Admin to change/add college association for a specific exam record
+    if (req.admin.role === 'main' && collegeId) {
+      updateData.collegeId = collegeId;
+    }
 
     const exam = await Exam.findByIdAndUpdate(
       req.params.id,
