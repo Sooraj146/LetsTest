@@ -13,6 +13,7 @@ const {
   getStudents,
   addStudent,
   deleteStudent,
+  bulkAddStudents,
 } = require('../controllers/adminController');
 const {
   createExam,
@@ -49,8 +50,9 @@ router.put('/accounts/:id',    updateAdminAccount);
 router.delete('/accounts/:id', deleteAdminAccount);
 
 // ── Student management ─────────────────────────────────────────────
-router.get('/students',     getStudents);
-router.post('/students',    addStudent);
+router.get('/students',      getStudents);
+router.post('/students',     addStudent);
+router.post('/students/bulk', bulkAddStudents);
 router.delete('/students/:id', deleteStudent);
 
 // ── Exam management ────────────────────────────────────────────────

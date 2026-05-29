@@ -46,11 +46,40 @@ exports.addStudent = async (req, res) => {
 // @route DELETE /api/admin/students/:id
 exports.deleteStudent = async (req, res) => {
   try {
-    // Note: We could verify if the student belongs to the admin's college here
     const student = await Student.findByIdAndDelete(req.params.id);
     if (!student) return res.status(404).json({ message: 'Student not found' });
     res.status(200).json({ message: 'Student deleted' });
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Bulk add students
+// @route POST /api/admin/students/bulk
+exports.bulkAddStudents = async (req, res) => {
+  try {
+    const { collegeId, students } = req.body;
+    if (!collegeId || !Array.isArray(students)) {
+      return res.status(400).json({ message: 'collegeId and students array are required' });
+    }
+
+    const withCollegeId = students.map(s => ({ ...s, collegeId }));
+    
+    // We use insertMany with ordered: false to continue even if some fail (e.g. duplicate roll numbers)
+    const result = await Student.insertMany(withCollegeId, { ordered: false });
+    
+    res.status(201).json({
+      message: `${result.length} students added successfully.`,
+      count: result.length
+    });
+  } catch (error) {
+    if (error.code === 11000 || (error.writeErrors && error.writeErrors.length > 0)) {
+      const insertedCount = error.insertedDocs ? error.insertedDocs.length : 0;
+      return res.status(201).json({
+        message: `Processed with some duplicates. ${insertedCount} new students added.`,
+        count: insertedCount
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 };

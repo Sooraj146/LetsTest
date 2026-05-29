@@ -1,9 +1,11 @@
-// Admin Panel Logic
+// Admin Panel Logic - Professional Edition
 let currentAdmin = JSON.parse(localStorage.getItem('admin')) || null;
 let currentTab = 'exams';
 let selectedExamId = null;
 let colleges = [];
-let selectedCollegeId = ''; // For main admin filter
+let selectedCollegeId = ''; 
+let leaderboardData = [];
+let examQuestions = [];
 
 // DOM Elements
 const loginPanel = document.getElementById('loginPanel');
@@ -19,6 +21,12 @@ document.addEventListener('DOMContentLoaded', () => {
         loginPanel.classList.remove('hidden');
     }
 });
+
+function refreshIcons() {
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+}
 
 // ── Auth ─────────────────────────────────────────────────────────────
 
@@ -37,9 +45,9 @@ loginForm.onsubmit = async (e) => {
         });
         const data = await res.json();
         
-        if (!res.ok) throw new Error(data.message || 'Login failed');
+        if (!res.ok) throw new Error(data.message || 'Access Denied');
         
-        currentAdmin = { ...data, password }; // Store password for header-based auth
+        currentAdmin = { ...data, password };
         localStorage.setItem('admin', JSON.stringify(currentAdmin));
         showDashboard();
     } catch (err) {
@@ -68,7 +76,7 @@ function showDashboard() {
     adminPanel.classList.remove('hidden');
     
     document.getElementById('adminUsername').textContent = currentAdmin.username;
-    document.getElementById('adminRoleLabel').textContent = currentAdmin.role + ' admin';
+    document.getElementById('adminRoleLabel').textContent = currentAdmin.role + ' administrator';
     
     if (currentAdmin.role === 'main') {
         document.getElementById('mainAdminLinks').classList.remove('hidden');
@@ -101,84 +109,98 @@ async function loadColleges() {
 function showTab(tabId) {
     currentTab = tabId;
     
-    // Update sidebar UI
-    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
-    const activeTabBtn = document.getElementById(`tab-${tabId}`);
-    if (activeTabBtn) activeTabBtn.classList.add('active');
+    document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('active'));
+    const activeBtn = document.getElementById(`tab-${tabId}`);
+    if (activeBtn) activeBtn.classList.add('active');
     
-    // Update content visibility
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.getElementById(`content-${tabId}`).classList.add('active');
     
-    // Update Header
     const titles = {
-        colleges: ['Colleges', 'Manage educational institutions'],
-        accounts: ['Mini Admins', 'Manage college-level administrators'],
-        exams: ['Exams', 'Create and manage test sessions'],
-        students: ['Students', 'Manage pre-populated student lists'],
-        'exam-details': ['Exam Details', 'View results and manage questions']
+        colleges: ['Institutions', 'Global management of registered colleges'],
+        accounts: ['Administrators', 'Assign and manage college-level access'],
+        exams: ['Assessments', 'Control and monitor exam sessions'],
+        students: ['Students', 'Manage student eligibility and profiles'],
+        'exam-details': ['Analysis', 'Real-time performance and management']
     };
+    
     document.getElementById('tabTitle').textContent = titles[tabId][0];
     document.getElementById('tabDescription').textContent = titles[tabId][1];
     
     loadCurrentTab();
+    refreshIcons();
 }
 
 function loadCurrentTab() {
     if (currentAdmin.role === 'main') {
-        selectedCollegeId = document.getElementById('collegeFilter').value;
+        const filter = document.getElementById('collegeFilter');
+        if (filter) selectedCollegeId = filter.value;
     }
 
     switch (currentTab) {
-        case 'colleges': loadCollegesList(); break;
+        case 'colleges': loadCollegesGrid(); break;
         case 'accounts': loadAccountsList(); break;
         case 'exams': loadExamsGrid(); break;
         case 'students': loadStudentsList(); break;
     }
 }
 
-// ── Colleges Management ──────────────────────────────────────────────
+// ── Colleges ─────────────────────────────────────────────────────────
 
-async function loadCollegesList() {
-    const list = document.getElementById('collegeList');
-    list.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center">Loading...</td></tr>';
+async function loadCollegesGrid() {
+    const grid = document.getElementById('collegeGrid');
+    grid.innerHTML = '<div class="col-span-full py-20 flex flex-col items-center gap-4 text-slate-500"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div><p>Fetching Institutions...</p></div>';
     
     try {
         const res = await fetch('/api/admin/colleges', { headers: getAuthHeaders() });
         const data = await res.json();
-        colleges = data; // Keep sync
+        colleges = data;
         
-        list.innerHTML = data.map(c => `
-            <tr>
-                <td class="px-6 py-4 font-medium text-white">${c.name}</td>
-                <td class="px-6 py-4 text-slate-400 font-mono text-sm">${c.domain}</td>
-                <td class="px-6 py-4 text-right">
-                    <button onclick="openCollegeModal('${c._id}')" class="text-primary-400 hover:text-white mr-3">Edit</button>
-                    <button onclick="deleteCollege('${c._id}')" class="text-red-400 hover:text-red-300">Delete</button>
-                </td>
-            </tr>
+        if (data.length === 0) {
+            grid.innerHTML = '<div class="col-span-full py-20 text-center text-slate-500">No colleges registered yet.</div>';
+            return;
+        }
+
+        grid.innerHTML = data.map(c => `
+            <div class="glass-card p-6 rounded-3xl relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-primary-500/5 rounded-full -mr-8 -mt-8 transition-all group-hover:scale-150"></div>
+                <div class="flex justify-between items-start mb-4 relative">
+                    <div class="w-12 h-12 bg-dark-800 rounded-2xl flex items-center justify-center text-primary-400 group-hover:bg-primary-500 group-hover:text-white transition-all">
+                        <i data-lucide="building" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex gap-1">
+                        <button onclick="openCollegeModal('${c._id}')" class="p-2 text-slate-500 hover:text-white transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        <button onclick="deleteCollege('${c._id}')" class="p-2 text-slate-500 hover:text-red-400 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                </div>
+                <h4 class="text-xl font-bold text-white mb-1">${c.name}</h4>
+                <p class="text-sm text-slate-500 font-mono">${c.domain}</p>
+            </div>
         `).join('');
+        refreshIcons();
     } catch (err) {
-        list.innerHTML = `<tr><td colspan="3" class="px-6 py-4 text-center text-red-400">${err.message}</td></tr>`;
+        grid.innerHTML = `<div class="col-span-full py-20 text-center text-red-400">${err.message}</div>`;
     }
 }
 
 function openCollegeModal(id = null) {
     const college = id ? colleges.find(c => c._id === id) : { name: '', domain: '' };
+    setModalTitle(id ? 'Edit Institution' : 'New Institution');
     showModal(`
-        <h2 class="text-2xl font-bold text-white mb-6">${id ? 'Edit' : 'Add'} College</h2>
-        <form onsubmit="saveCollege(event, ${id ? `'${id}'` : 'null'})" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">College Name</label>
-                <input type="text" name="name" value="${college.name}" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white">
+        <form onsubmit="saveCollege(event, ${id ? `'${id}'` : 'null'})" class="space-y-6">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">College Name</label>
+                    <input type="text" name="name" value="${college.name}" required class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-primary-500 outline-none text-white transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Restricted Email Domain</label>
+                    <input type="text" name="domain" value="${college.domain}" placeholder="@college.ac.in" required class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-primary-500 outline-none text-white transition-all">
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">Email Domain (e.g. @gectcr.ac.in)</label>
-                <input type="text" name="domain" value="${college.domain}" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white">
-            </div>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeModal()" class="flex-1 py-2 border border-dark-700 text-slate-300 rounded-lg">Cancel</button>
-                <button type="submit" class="flex-1 py-2 bg-primary-600 text-white rounded-lg font-bold">Save</button>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 hover:bg-white/10 text-slate-300 rounded-2xl font-bold">Discard</button>
+                <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Confirm</button>
             </div>
         </form>
     `);
@@ -190,83 +212,99 @@ async function saveCollege(e, id) {
     try {
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/admin/colleges/${id}` : '/api/admin/colleges';
-        const res = await fetch(url, {
-            method,
-            headers: getAuthHeaders(),
-            body: JSON.stringify(body)
-        });
-        if (!res.ok) throw new Error('Failed to save college');
+        const res = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(body) });
+        if (!res.ok) throw new Error('Failed to synchronize college');
         closeModal();
-        loadCollegesList();
-        loadColleges(); // Update filter
+        loadCollegesGrid();
+        loadColleges(); 
     } catch (err) {
         alert(err.message);
     }
 }
 
 async function deleteCollege(id) {
-    if (!confirm('Are you sure? This will not delete associated data but may cause issues.')) return;
+    if (!confirm('Permanent Action: All linked accounts and data will be affected. Continue?')) return;
     try {
         const res = await fetch(`/api/admin/colleges/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Failed to delete');
-        loadCollegesList();
+        loadCollegesGrid();
         loadColleges();
     } catch (err) {
         alert(err.message);
     }
 }
 
-// ── Mini Admins Management ───────────────────────────────────────────
+// ── Admins ───────────────────────────────────────────────────────────
 
 async function loadAccountsList() {
     const list = document.getElementById('accountList');
-    list.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center">Loading...</td></tr>';
+    list.innerHTML = '<tr><td colspan="4" class="px-8 py-10 text-center text-slate-500">Syncing database...</td></tr>';
     
     try {
         const res = await fetch('/api/admin/accounts', { headers: getAuthHeaders() });
         const accounts = await res.json();
+        window.allAccounts = accounts;
         
+        if (accounts.length === 0) {
+            list.innerHTML = '<tr><td colspan="4" class="px-8 py-10 text-center text-slate-500">No mini admins created.</td></tr>';
+            return;
+        }
+
         list.innerHTML = accounts.map(a => `
-            <tr>
-                <td class="px-6 py-4 font-medium text-white">${a.username}</td>
-                <td class="px-6 py-4 text-slate-400">${a.collegeId?.name || 'Unknown'}</td>
-                <td class="px-6 py-4 text-slate-500 font-mono text-xs">${a.password}</td>
-                <td class="px-6 py-4 text-right">
-                    <button onclick="openAccountModal('${a._id}')" class="text-primary-400 hover:text-white mr-3">Edit</button>
-                    <button onclick="deleteAccount('${a._id}')" class="text-red-400 hover:text-red-300">Delete</button>
+            <tr class="group hover:bg-white/[0.02] transition-all">
+                <td class="px-8 py-5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-primary-500/10 rounded-xl flex items-center justify-center text-primary-400 group-hover:bg-primary-500 group-hover:text-white transition-all">
+                            <i data-lucide="user" class="w-5 h-5"></i>
+                        </div>
+                        <span class="font-bold text-white">${a.username}</span>
+                    </div>
+                </td>
+                <td class="px-8 py-5 text-slate-400 text-sm">${a.collegeId?.name || '---'}</td>
+                <td class="px-8 py-5">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-mono bg-dark-800 px-2 py-1 rounded border border-white/5 text-slate-500">${a.password}</span>
+                    </div>
+                </td>
+                <td class="px-8 py-5 text-right">
+                    <div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                        <button onclick="openAccountModal('${a._id}')" class="p-2 glass rounded-lg text-slate-400 hover:text-white"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                        <button onclick="deleteAccount('${a._id}')" class="p-2 glass rounded-lg text-slate-400 hover:text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
                 </td>
             </tr>
         `).join('');
-        // Store accounts globally if needed for editing
-        window.allAccounts = accounts;
+        refreshIcons();
     } catch (err) {
-        list.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-red-400">${err.message}</td></tr>`;
+        list.innerHTML = `<tr><td colspan="4" class="px-8 py-10 text-center text-red-400">${err.message}</td></tr>`;
     }
 }
 
 function openAccountModal(id = null) {
     const acc = id ? window.allAccounts.find(a => a._id === id) : { username: '', password: '', collegeId: { _id: '' } };
+    setModalTitle(id ? 'Update Permissions' : 'Assign New Admin');
     showModal(`
-        <h2 class="text-2xl font-bold text-white mb-6">${id ? 'Edit' : 'Add'} Mini Admin</h2>
-        <form onsubmit="saveAccount(event, ${id ? `'${id}'` : 'null'})" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">Username</label>
-                <input type="text" name="username" value="${acc.username}" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white">
+        <form onsubmit="saveAccount(event, ${id ? `'${id}'` : 'null'})" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Unique Username</label>
+                    <input type="text" name="username" value="${acc.username}" required class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-primary-500 outline-none text-white transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Access Key (Password)</label>
+                    <input type="text" name="password" value="${acc.password}" required class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-primary-500 outline-none text-white transition-all">
+                </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">Password</label>
-                <input type="text" name="password" value="${acc.password}" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">College</label>
-                <select name="collegeId" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white">
-                    <option value="" disabled>Select College</option>
+                <label class="block text-sm font-semibold text-slate-400 mb-2">Assigned College</label>
+                <select name="collegeId" required class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white appearance-none focus:ring-2 focus:ring-primary-500 transition-all">
+                    <option value="" disabled>Choose Institution...</option>
                     ${colleges.map(c => `<option value="${c._id}" ${c._id === acc.collegeId?._id ? 'selected' : ''}>${c.name}</option>`).join('')}
                 </select>
             </div>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeModal()" class="flex-1 py-2 border border-dark-700 text-slate-300 rounded-lg">Cancel</button>
-                <button type="submit" class="flex-1 py-2 bg-primary-600 text-white rounded-lg font-bold">Save</button>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 hover:bg-white/10 text-slate-300 rounded-2xl font-bold">Cancel</button>
+                <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Save Profile</button>
             </div>
         </form>
     `);
@@ -282,12 +320,8 @@ async function saveAccount(e, id) {
     try {
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/admin/accounts/${id}` : '/api/admin/accounts';
-        const res = await fetch(url, {
-            method,
-            headers: getAuthHeaders(),
-            body: JSON.stringify(body)
-        });
-        if (!res.ok) throw new Error('Failed to save account');
+        const res = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(body) });
+        if (!res.ok) throw new Error('Account update failed');
         closeModal();
         loadAccountsList();
     } catch (err) {
@@ -296,21 +330,21 @@ async function saveAccount(e, id) {
 }
 
 async function deleteAccount(id) {
-    if (!confirm('Are you sure?')) return;
+    if (!confirm('Revoke access for this admin?')) return;
     try {
         const res = await fetch(`/api/admin/accounts/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-        if (!res.ok) throw new Error('Failed to delete');
+        if (!res.ok) throw new Error('Action blocked by server');
         loadAccountsList();
     } catch (err) {
         alert(err.message);
     }
 }
 
-// ── Exam Management ──────────────────────────────────────────────────
+// ── Exams ────────────────────────────────────────────────────────────
 
 async function loadExamsGrid() {
     const grid = document.getElementById('examGrid');
-    grid.innerHTML = '<div class="col-span-full text-center py-10 text-slate-500">Loading exams...</div>';
+    grid.innerHTML = '<div class="col-span-full py-20 text-center text-slate-500"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4"></div>Optimizing assessments...</div>';
     
     try {
         const res = await fetch(`/api/exams?collegeId=${selectedCollegeId}`);
@@ -318,66 +352,103 @@ async function loadExamsGrid() {
         window.allExams = exams;
 
         if (exams.length === 0) {
-            grid.innerHTML = '<div class="col-span-full text-center py-10 text-slate-500">No exams created for this college.</div>';
+            grid.innerHTML = '<div class="col-span-full py-20 text-center"><div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600"><i data-lucide="clipboard-x"></i></div><p class="text-slate-500">No active exams found for this scope.</p></div>';
+            refreshIcons();
             return;
         }
 
         grid.innerHTML = exams.map(exam => `
-            <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between hover:border-primary-500/50 transition-all group">
-                <div>
-                    <div class="flex justify-between items-start mb-4">
-                        <h3 class="text-xl font-bold text-white group-hover:text-primary-400 transition-all">${exam.title}</h3>
-                        <div class="flex gap-2">
-                            <button onclick="openExamModal('${exam._id}')" class="p-1 text-slate-500 hover:text-white transition-all"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                            <button onclick="deleteExam('${exam._id}')" class="p-1 text-slate-500 hover:text-red-400 transition-all"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <div class="glass-card p-8 rounded-[2rem] flex flex-col group">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-extrabold text-white mb-2 leading-tight group-hover:text-primary-400 transition-all">${exam.title}</h3>
+                        <div class="flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-widest">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                            Live Assessment
                         </div>
                     </div>
-                    <div class="space-y-2 text-sm text-slate-400">
-                        <div class="flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            <span>${exam.startTime ? new Date(exam.startTime).toLocaleString() : 'Open Start'}</span>
+                    <div class="flex gap-2">
+                        <button onclick="openExamModal('${exam._id}')" class="p-2.5 glass rounded-xl text-slate-500 hover:text-white transition-all"><i data-lucide="settings-2" class="w-5 h-5"></i></button>
+                        <button onclick="deleteExam('${exam._id}')" class="p-2.5 glass rounded-xl text-slate-500 hover:text-red-400 transition-all"><i data-lucide="trash" class="w-5 h-5"></i></button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-4 mb-8">
+                    <div class="flex items-center gap-4 p-3 bg-white/5 rounded-2xl border border-white/5">
+                        <div class="w-10 h-10 bg-primary-500/10 rounded-xl flex items-center justify-center text-primary-400">
+                            <i data-lucide="calendar-days" class="w-5 h-5"></i>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            <span>${exam.endTime ? new Date(exam.endTime).toLocaleString() : 'No Deadline'}</span>
+                        <div class="text-xs">
+                            <p class="text-slate-500 font-bold uppercase tracking-tighter">Start Time</p>
+                            <p class="text-white font-medium">${exam.startTime ? new Date(exam.startTime).toLocaleString() : 'Instantly Open'}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-3 bg-white/5 rounded-2xl border border-white/5">
+                        <div class="w-10 h-10 bg-accent-500/10 rounded-xl flex items-center justify-center text-accent-400">
+                            <i data-lucide="timer" class="w-5 h-5"></i>
+                        </div>
+                        <div class="text-xs">
+                            <p class="text-slate-500 font-bold uppercase tracking-tighter">Deadline</p>
+                            <p class="text-white font-medium">${exam.endTime ? new Date(exam.endTime).toLocaleString() : 'Indefinite'}</p>
                         </div>
                     </div>
                 </div>
-                <button onclick="viewExamDetails('${exam._id}')" class="mt-6 w-full py-2 bg-dark-800 hover:bg-primary-600 text-slate-300 hover:text-white rounded-lg text-sm font-semibold transition-all">View Details & Questions</button>
+
+                <button onclick="viewExamDetails('${exam._id}')" class="mt-auto w-full py-4 btn-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 group/btn">
+                    Open Control Center
+                    <i data-lucide="chevron-right" class="w-5 h-5 transition-transform group-hover/btn:translate-x-1"></i>
+                </button>
             </div>
         `).join('');
+        refreshIcons();
     } catch (err) {
-        grid.innerHTML = `<div class="col-span-full text-center py-10 text-red-400">${err.message}</div>`;
+        grid.innerHTML = `<div class="col-span-full py-20 text-center text-red-400">${err.message}</div>`;
     }
 }
 
 function openExamModal(id = null) {
     const exam = id ? window.allExams.find(e => e._id === id) : { title: '', startTime: '', endTime: '' };
-    
-    // Format dates for input type datetime-local (YYYY-MM-DDTHH:mm)
     const fmt = (d) => d ? new Date(d).toISOString().slice(0, 16) : '';
+    setModalTitle(id ? 'Refine Assessment' : 'Launch New Assessment');
+    
+    let collegeSelection = '';
+    if (!id && currentAdmin.role === 'main') {
+        collegeSelection = `
+            <div>
+                <label class="block text-sm font-semibold text-slate-400 mb-3">Distribute to Institutions</label>
+                <div class="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                    ${colleges.map(c => `
+                        <label class="flex items-center gap-3 p-3 glass rounded-xl cursor-pointer hover:border-primary-500/50 transition-all">
+                            <input type="checkbox" name="collegeIds" value="${c._id}" checked class="w-5 h-5 rounded-lg accent-primary-500">
+                            <span class="text-sm font-medium text-slate-300 truncate">${c.name}</span>
+                        </label>
+                    `).join('')}
+                </div>
+                <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">Separate exams will be created for each selection</p>
+            </div>
+        `;
+    }
 
     showModal(`
-        <h2 class="text-2xl font-bold text-white mb-6">${id ? 'Edit' : 'Create'} Exam</h2>
-        <form onsubmit="saveExam(event, ${id ? `'${id}'` : 'null'})" class="space-y-4">
+        <form onsubmit="saveExam(event, ${id ? `'${id}'` : 'null'})" class="space-y-6">
             <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">Exam Title</label>
-                <input type="text" name="title" value="${exam.title}" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white focus:border-primary-500">
+                <label class="block text-sm font-semibold text-slate-400 mb-2">Assessment Title</label>
+                <input type="text" name="title" value="${exam.title}" required placeholder="e.g. End Semester Aptitude 2026" class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-primary-500 outline-none text-white transition-all">
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            ${collegeSelection}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1">Start Time</label>
-                    <input type="datetime-local" name="startTime" value="${fmt(exam.startTime)}" class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white focus:border-primary-500">
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Activation Window</label>
+                    <input type="datetime-local" name="startTime" value="${fmt(exam.startTime)}" class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white focus:ring-2 focus:ring-primary-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-1">End Time</label>
-                    <input type="datetime-local" name="endTime" value="${fmt(exam.endTime)}" class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white focus:border-primary-500">
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Expiry Window</label>
+                    <input type="datetime-local" name="endTime" value="${fmt(exam.endTime)}" class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white focus:ring-2 focus:ring-primary-500">
                 </div>
             </div>
-            <p class="text-xs text-slate-500">Leave times empty for a permanently open exam.</p>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeModal()" class="flex-1 py-2 border border-dark-700 text-slate-300 rounded-lg">Cancel</button>
-                <button type="submit" class="flex-1 py-2 bg-primary-600 text-white rounded-lg font-bold">Save Exam</button>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 hover:bg-white/10 text-slate-300 rounded-2xl font-bold">Discard</button>
+                <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Launch Exam</button>
             </div>
         </form>
     `);
@@ -385,24 +456,27 @@ function openExamModal(id = null) {
 
 async function saveExam(e, id) {
     e.preventDefault();
+    const collegeIds = Array.from(e.target.querySelectorAll('input[name="collegeIds"]:checked')).map(i => i.value);
     const body = { 
         title: e.target.title.value, 
         startTime: e.target.startTime.value || null,
         endTime: e.target.endTime.value || null,
-        collegeId: selectedCollegeId
     };
+    
+    if (id) {
+        body.collegeId = selectedCollegeId;
+    } else if (currentAdmin.role === 'main') {
+        body.collegeIds = collegeIds;
+        if (collegeIds.length === 0) return alert('Select at least one college');
+    } else {
+        body.collegeId = currentAdmin.college?._id;
+    }
+
     try {
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/admin/exams/${id}` : '/api/admin/exams';
-        const res = await fetch(url, {
-            method,
-            headers: getAuthHeaders(),
-            body: JSON.stringify(body)
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || 'Failed to save exam');
-        }
+        const res = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(body) });
+        if (!res.ok) throw new Error('Exam creation failed');
         closeModal();
         loadExamsGrid();
     } catch (err) {
@@ -411,63 +485,69 @@ async function saveExam(e, id) {
 }
 
 async function deleteExam(id) {
-    if (!confirm('Are you sure you want to delete this exam? ALL associated questions and results will be lost!')) return;
+    if (!confirm('Critical Warning: This will erase all results and questions. Confirm?')) return;
     try {
         const res = await fetch(`/api/admin/exams/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-        if (!res.ok) throw new Error('Failed to delete');
+        if (!res.ok) throw new Error('Permission denied');
         loadExamsGrid();
     } catch (err) {
         alert(err.message);
     }
 }
 
-// ── Student Management ───────────────────────────────────────────────
+// ── Students ─────────────────────────────────────────────────────────
 
 async function loadStudentsList() {
     const list = document.getElementById('studentList');
-    list.innerHTML = '<tr><td colspan="3" class="px-6 py-4 text-center">Loading students...</td></tr>';
+    list.innerHTML = '<tr><td colspan="3" class="px-8 py-10 text-center text-slate-500">Syncing profiles...</td></tr>';
     
     try {
         const res = await fetch(`/api/admin/students?collegeId=${selectedCollegeId}`, { headers: getAuthHeaders() });
         const data = await res.json();
         window.allStudents = data;
 
-        document.getElementById('studentCount').textContent = `Total: ${data.length}`;
+        document.getElementById('studentCountBadge').textContent = `${data.length} Active`;
         
         if (data.length === 0) {
-            list.innerHTML = '<tr><td colspan="3" class="px-6 py-10 text-center text-slate-500">No students found for this college.</td></tr>';
+            list.innerHTML = '<tr><td colspan="3" class="px-8 py-20 text-center"><div class="text-slate-600 mb-2"><i data-lucide="user-x" class="w-10 h-10 mx-auto"></i></div><p class="text-slate-500">Empty Student Database.</p></td></tr>';
+            refreshIcons();
             return;
         }
 
         list.innerHTML = data.map(s => `
-            <tr>
-                <td class="px-6 py-4 font-mono text-primary-400">${s.rollNumber}</td>
-                <td class="px-6 py-4 font-medium text-white">${s.name}</td>
-                <td class="px-6 py-4 text-right">
-                    <button onclick="deleteStudent('${s._id}')" class="text-red-400 hover:text-red-300">Delete</button>
+            <tr class="group hover:bg-white/[0.02] transition-all">
+                <td class="px-8 py-5">
+                    <span class="font-mono text-primary-400 font-bold bg-primary-500/5 px-2 py-1 rounded-lg border border-primary-500/10">${s.rollNumber}</span>
+                </td>
+                <td class="px-8 py-5 font-bold text-white">${s.name}</td>
+                <td class="px-8 py-5 text-right">
+                    <button onclick="deleteStudent('${s._id}')" class="p-2 text-slate-500 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100"><i data-lucide="user-minus" class="w-5 h-5"></i></button>
                 </td>
             </tr>
         `).join('');
+        refreshIcons();
     } catch (err) {
-        list.innerHTML = `<tr><td colspan="3" class="px-6 py-4 text-center text-red-400">${err.message}</td></tr>`;
+        list.innerHTML = `<tr><td colspan="3" class="px-8 py-10 text-center text-red-400">${err.message}</td></tr>`;
     }
 }
 
 function openStudentModal() {
+    setModalTitle('New Student Identity');
     showModal(`
-        <h2 class="text-2xl font-bold text-white mb-6">Add Student</h2>
-        <form onsubmit="saveStudent(event)" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">Roll Number</label>
-                <input type="number" name="rollNumber" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white">
+        <form onsubmit="saveStudent(event)" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Roll Identity</label>
+                    <input type="number" name="rollNumber" required class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Legal Name</label>
+                    <input type="text" name="name" required class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white focus:ring-2 focus:ring-primary-500">
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
-                <input type="text" name="name" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white">
-            </div>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeModal()" class="flex-1 py-2 border border-dark-700 text-slate-300 rounded-lg">Cancel</button>
-                <button type="submit" class="flex-1 py-2 bg-primary-600 text-white rounded-lg font-bold">Add Student</button>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 hover:bg-white/10 text-slate-300 rounded-2xl font-bold">Discard</button>
+                <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Create Student</button>
             </div>
         </form>
     `);
@@ -475,21 +555,10 @@ function openStudentModal() {
 
 async function saveStudent(e) {
     e.preventDefault();
-    const body = { 
-        name: e.target.name.value, 
-        rollNumber: e.target.rollNumber.value,
-        collegeId: selectedCollegeId
-    };
+    const body = { name: e.target.name.value, rollNumber: e.target.rollNumber.value, collegeId: selectedCollegeId };
     try {
-        const res = await fetch('/api/admin/students', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(body)
-        });
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || 'Failed to add student');
-        }
+        const res = await fetch('/api/admin/students', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(body) });
+        if (!res.ok) throw new Error((await res.json()).message);
         closeModal();
         loadStudentsList();
     } catch (err) {
@@ -497,40 +566,73 @@ async function saveStudent(e) {
     }
 }
 
+function openBulkStudentModal() {
+    setModalTitle('Students Bulk Sync');
+    showModal(`
+        <div class="space-y-6">
+            <div class="p-6 bg-primary-500/5 border border-primary-500/10 rounded-2xl">
+                <p class="text-xs text-slate-400 uppercase tracking-widest font-bold mb-4">Required Data Structure (JSON)</p>
+                <code class="text-[10px] text-primary-400 block whitespace-pre">[\n  { "rollNumber": 101, "name": "John Doe" },\n  { "rollNumber": 102, "name": "Jane Smith" }\n]</code>
+            </div>
+            <form onsubmit="handleBulkStudents(event)" class="space-y-6">
+                <textarea name="jsonContent" required rows="8" placeholder="Paste student array here..." class="w-full px-5 py-4 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white font-mono text-xs focus:ring-2 focus:ring-primary-500"></textarea>
+                <div class="flex gap-4">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 text-slate-300 rounded-2xl font-bold">Cancel</button>
+                    <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Start Sync</button>
+                </div>
+            </form>
+        </div>
+    `);
+}
+
+async function handleBulkStudents(e) {
+    e.preventDefault();
+    try {
+        const students = JSON.parse(e.target.jsonContent.value);
+        const res = await fetch('/api/admin/students/bulk', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ collegeId: selectedCollegeId, students })
+        });
+        const data = await res.json();
+        alert(data.message);
+        closeModal();
+        loadStudentsList();
+    } catch (err) {
+        alert('Validation Error: ' + err.message);
+    }
+}
+
 async function deleteStudent(id) {
-    if (!confirm('Remove this student?')) return;
+    if (!confirm('Remove student profile?')) return;
     try {
         const res = await fetch(`/api/admin/students/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-        if (!res.ok) throw new Error('Failed to delete');
+        if (!res.ok) throw new Error('Access denied');
         loadStudentsList();
     } catch (err) {
         alert(err.message);
     }
 }
 
-// ── Exam Details (Sub-Tabs) ──────────────────────────────────────────
+// ── Control Center (Exam Details) ────────────────────────────────────
 
 function viewExamDetails(id) {
     selectedExamId = id;
     const exam = window.allExams.find(e => e._id === id);
     showTab('exam-details');
-    document.getElementById('tabTitle').textContent = exam.title;
-    document.getElementById('tabDescription').textContent = 'Results, Questions and Analytics';
+    document.getElementById('detailExamTitle').textContent = exam.title;
     showSubTab('leaderboard');
 }
 
-function showSubTab(subTabId) {
-    document.querySelectorAll('.subtab-item').forEach(el => el.classList.remove('active', 'bg-primary-600', 'text-white'));
-    document.querySelectorAll('.subtab-item').forEach(el => el.classList.add('bg-dark-800', 'text-slate-400'));
-    
-    const btn = document.getElementById(`subtab-${subTabId}`);
-    btn.classList.remove('bg-dark-800', 'text-slate-400');
-    btn.classList.add('active', 'bg-primary-600', 'text-white');
+function showSubTab(subId) {
+    document.querySelectorAll('.subtab-item').forEach(el => el.classList.remove('active'));
+    document.getElementById(`subtab-${subId}`).classList.add('active');
     
     document.querySelectorAll('.subtab-content').forEach(el => el.classList.add('hidden'));
-    document.getElementById(`subcontent-${subTabId}`).classList.remove('hidden');
+    document.getElementById(`subcontent-${subId}`).classList.remove('hidden');
     
-    loadSubTabContent(subTabId);
+    loadSubTabContent(subId);
+    refreshIcons();
 }
 
 function loadSubTabContent(id) {
@@ -543,143 +645,150 @@ function loadSubTabContent(id) {
 
 async function loadLeaderboard() {
     const list = document.getElementById('leaderboardList');
-    list.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center">Loading results...</td></tr>';
+    list.innerHTML = '<tr><td colspan="4" class="px-8 py-10 text-center text-slate-500">Aggregating results...</td></tr>';
     try {
         const res = await fetch(`/api/admin/leaderboard?examId=${selectedExamId}`, { headers: getAuthHeaders() });
         const { leaderboard, totalQuestions } = await res.json();
+        leaderboardData = leaderboard;
+        window.totalQuestions = totalQuestions;
         
         if (leaderboard.length === 0) {
-            list.innerHTML = '<tr><td colspan="4" class="px-6 py-10 text-center text-slate-500">No submissions yet.</td></tr>';
+            list.innerHTML = '<tr><td colspan="4" class="px-8 py-20 text-center text-slate-500">No submissions recorded yet.</td></tr>';
             return;
         }
 
         list.innerHTML = leaderboard.map(u => `
-            <tr>
-                <td class="px-6 py-4">
-                    <span class="w-8 h-8 rounded-full flex items-center justify-center font-bold ${u.rank === 1 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-dark-800 text-slate-400'}">${u.rank}</span>
+            <tr class="group hover:bg-white/[0.02] transition-all">
+                <td class="px-8 py-5">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-black ${u.rank === 1 ? 'bg-yellow-500/20 text-yellow-500 shadow-[0_0_12px_rgba(234,179,8,0.2)]' : 'bg-dark-800 text-slate-500'}">${u.rank}</div>
                 </td>
-                <td class="px-6 py-4">
-                    <div class="text-white font-medium">${u.name}</div>
-                    <div class="text-slate-500 text-xs">${u.rollNumber} • ${u.email}</div>
+                <td class="px-8 py-5">
+                    <div class="text-white font-bold">${u.name}</div>
+                    <div class="text-slate-500 text-[10px] uppercase font-bold tracking-widest">${u.rollNumber} • ${u.email}</div>
                 </td>
-                <td class="px-6 py-4">
-                    <div class="text-primary-400 font-bold text-lg">${u.totalScore} <span class="text-slate-600 text-xs font-normal">/ ${totalQuestions}</span></div>
+                <td class="px-8 py-5 text-center">
+                    <span class="text-lg font-black text-primary-400">${u.totalScore}</span>
+                    <span class="text-slate-600 font-bold">/${totalQuestions}</span>
                 </td>
-                <td class="px-6 py-4 text-slate-400 text-sm">
-                    ${new Date(u.submittedAt).toLocaleTimeString()}
+                <td class="px-8 py-5 text-right text-slate-400 font-mono text-xs">
+                    ${new Date(u.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </td>
             </tr>
         `).join('');
     } catch (err) {
-        list.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-red-400">${err.message}</td></tr>`;
+        list.innerHTML = `<tr><td colspan="4" class="px-8 py-10 text-center text-red-400">${err.message}</td></tr>`;
     }
 }
 
 async function loadQuestions() {
     const list = document.getElementById('questionList');
-    list.innerHTML = '<div class="text-center py-10 text-slate-500">Loading questions...</div>';
+    list.innerHTML = '<div class="col-span-full py-20 text-center text-slate-500">Retrieving question bank...</div>';
     try {
         const res = await fetch(`/api/admin/questions?examId=${selectedExamId}`, { headers: getAuthHeaders() });
-        const questions = await res.json();
-        window.examQuestions = questions;
+        examQuestions = await res.json();
 
-        if (questions.length === 0) {
-            list.innerHTML = '<div class="text-center py-10 text-slate-500">No questions added yet.</div>';
+        if (examQuestions.length === 0) {
+            list.innerHTML = '<div class="col-span-full py-20 text-center text-slate-500">The question bank is empty.</div>';
             return;
         }
 
-        list.innerHTML = questions.map((q, i) => `
-            <div class="glass-panel p-6 rounded-xl border-l-4 ${q.correctAnswer ? 'border-l-primary-500' : 'border-l-red-500'}">
+        list.innerHTML = examQuestions.map((q, i) => `
+            <div class="glass-card p-6 rounded-3xl relative">
                 <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <span class="text-xs uppercase tracking-widest text-slate-500 font-bold">${q.section || 'General'}</span>
-                        <h4 class="text-lg text-white font-medium mt-1">${i + 1}. ${q.questionText}</h4>
-                    </div>
+                    <span class="px-3 py-1 bg-white/5 rounded-full text-[10px] font-black uppercase text-slate-400 tracking-widest">${q.section || 'General'}</span>
                     <div class="flex gap-2">
-                        <button onclick="openQuestionModal('${q._id}')" class="text-slate-500 hover:text-white"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                        <button onclick="deleteQuestion('${q._id}')" class="text-slate-500 hover:text-red-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                        <button onclick="openQuestionModal('${q._id}')" class="p-2 text-slate-500 hover:text-white transition-all"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                        <button onclick="deleteQuestion('${q._id}')" class="p-2 text-slate-500 hover:text-red-400 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <h5 class="text-white font-bold mb-6 flex gap-3">
+                    <span class="text-primary-500 font-mono">Q${i+1}.</span>
+                    ${q.questionText}
+                </h5>
+                <div class="space-y-2">
                     ${q.options.map((opt, idx) => `
-                        <div class="px-4 py-2 rounded-lg text-sm ${idx === q.correctAnswer ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-dark-800 text-slate-400'}">
-                            ${String.fromCharCode(65 + idx)}. ${opt}
+                        <div class="p-3 rounded-xl text-sm ${idx === q.correctAnswer ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-dark-900/50 text-slate-500 border border-white/5'}">
+                            <span class="font-bold mr-2 opacity-50">${String.fromCharCode(65 + idx)}.</span> ${opt}
                         </div>
                     `).join('')}
                 </div>
             </div>
         `).join('');
+        refreshIcons();
     } catch (err) {
-        list.innerHTML = `<div class="text-center py-10 text-red-400">${err.message}</div>`;
+        list.innerHTML = `<div class="col-span-full py-20 text-center text-red-400">${err.message}</div>`;
     }
 }
 
 async function loadAnalytics() {
     const list = document.getElementById('analyticsList');
-    list.innerHTML = '<div class="text-center py-10 text-slate-500">Generating analytics...</div>';
+    list.innerHTML = '<div class="col-span-full py-20 text-center text-slate-500">Computing statistics...</div>';
     try {
         const res = await fetch(`/api/admin/analytics?examId=${selectedExamId}`, { headers: getAuthHeaders() });
         const analytics = await res.json();
 
         if (analytics.length === 0) {
-            list.innerHTML = '<div class="text-center py-10 text-slate-500">No data to analyze.</div>';
+            list.innerHTML = '<div class="col-span-full py-20 text-center text-slate-500">No data points for analysis.</div>';
             return;
         }
 
         list.innerHTML = analytics.map(q => {
-            const correctPercent = Math.round((q.correctCount / q.totalStudents) * 100) || 0;
-            const wrongPercent = Math.round((q.wrongCount / q.totalStudents) * 100) || 0;
-            const skipPercent = 100 - correctPercent - wrongPercent;
+            const correctP = Math.round((q.correctCount / q.totalStudents) * 100) || 0;
+            const wrongP = Math.round((q.wrongCount / q.totalStudents) * 100) || 0;
+            const skipP = 100 - correctP - wrongP;
 
             return `
-                <div class="glass-panel p-6 rounded-xl">
-                    <p class="text-white mb-4"><span class="text-slate-500 font-mono mr-2">#</span> ${q.questionText}</p>
-                    <div class="h-4 w-full bg-dark-800 rounded-full overflow-hidden flex mb-2">
-                        <div style="width: ${correctPercent}%" class="bg-emerald-500 h-full" title="Correct"></div>
-                        <div style="width: ${wrongPercent}%" class="bg-red-500 h-full" title="Wrong"></div>
-                        <div style="width: ${skipPercent}%" class="bg-slate-700 h-full" title="Unattempted"></div>
+                <div class="glass-card p-6 rounded-3xl">
+                    <p class="text-white font-bold mb-4 line-clamp-2 text-sm">${q.questionText}</p>
+                    <div class="h-1.5 w-full bg-dark-900 rounded-full overflow-hidden flex mb-4">
+                        <div style="width: ${correctP}%" class="bg-emerald-500 h-full"></div>
+                        <div style="width: ${wrongP}%" class="bg-red-500 h-full"></div>
+                        <div style="width: ${skipP}%" class="bg-slate-700 h-full"></div>
                     </div>
-                    <div class="flex justify-between text-xs font-medium uppercase tracking-wider mt-3">
-                        <div class="text-emerald-500">Correct: ${q.correctCount} (${correctPercent}%)</div>
-                        <div class="text-red-400">Wrong: ${q.wrongCount} (${wrongPercent}%)</div>
-                        <div class="text-slate-500">Skipped: ${q.unattemptedCount} (${skipPercent}%)</div>
+                    <div class="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                        <div class="text-emerald-500">C: ${correctP}%</div>
+                        <div class="text-red-400">W: ${wrongP}%</div>
+                        <div class="text-slate-500">S: ${skipP}%</div>
                     </div>
                 </div>
             `;
         }).join('');
     } catch (err) {
-        list.innerHTML = `<div class="text-center py-10 text-red-400">${err.message}</div>`;
+        list.innerHTML = `<div class="col-span-full py-20 text-center text-red-400">${err.message}</div>`;
     }
 }
 
-// ── Question Modal ──────────────────────────────────────────────────
+// ── Question Management ──────────────────────────────────────────────
 
 function openQuestionModal(id = null) {
-    const q = id ? window.examQuestions.find(x => x._id === id) : { section: '', questionText: '', options: ['', '', '', ''], correctAnswer: 0 };
-    
+    const q = id ? examQuestions.find(x => x._id === id) : { section: '', questionText: '', options: ['', '', '', ''], correctAnswer: 0 };
+    setModalTitle(id ? 'Update Question' : 'Define Question');
     showModal(`
-        <h2 class="text-2xl font-bold text-white mb-6">${id ? 'Edit' : 'Add'} Question</h2>
-        <form onsubmit="saveQuestion(event, ${id ? `'${id}'` : 'null'})" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">Section (e.g. Verbal, Logic)</label>
-                <input type="text" name="section" value="${q.section}" required class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white focus:border-primary-500">
+        <form onsubmit="saveQuestion(event, ${id ? `'${id}'` : 'null'})" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-400 mb-2">Category / Section</label>
+                    <input type="text" name="section" value="${q.section}" placeholder="e.g. Logical Reasoning" required class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white focus:ring-2 focus:ring-primary-500">
+                </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1">Question Text</label>
-                <textarea name="questionText" required rows="3" class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white focus:border-primary-500">${q.questionText}</textarea>
+                <label class="block text-sm font-semibold text-slate-400 mb-2">Question Context</label>
+                <textarea name="questionText" required rows="3" class="w-full px-5 py-3.5 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white focus:ring-2 focus:ring-primary-500">${q.questionText}</textarea>
             </div>
-            <div class="space-y-3">
-                <label class="block text-sm font-medium text-slate-300">Options & Correct Answer</label>
+            <div class="space-y-4">
+                <label class="block text-sm font-semibold text-slate-400">Options & Verification</label>
                 ${q.options.map((opt, idx) => `
-                    <div class="flex items-center gap-3">
-                        <input type="radio" name="correctAnswer" value="${idx}" ${idx === q.correctAnswer ? 'checked' : ''} class="w-4 h-4 text-primary-600">
-                        <input type="text" name="option${idx}" value="${opt}" placeholder="Option ${String.fromCharCode(65 + idx)}" required class="flex-1 px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white focus:border-primary-500">
+                    <div class="flex items-center gap-4 group">
+                        <label class="flex-shrink-0 cursor-pointer">
+                            <input type="radio" name="correctAnswer" value="${idx}" ${idx === q.correctAnswer ? 'checked' : ''} class="w-6 h-6 rounded-full accent-emerald-500">
+                        </label>
+                        <input type="text" name="option${idx}" value="${opt}" placeholder="Option ${String.fromCharCode(65 + idx)}" required class="flex-1 px-5 py-3 bg-dark-900 border border-slate-800 rounded-xl outline-none text-white focus:border-primary-500 transition-all">
                     </div>
                 `).join('')}
             </div>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeModal()" class="flex-1 py-2 border border-dark-700 text-slate-300 rounded-lg">Cancel</button>
-                <button type="submit" class="flex-1 py-2 bg-primary-600 text-white rounded-lg font-bold">Save Question</button>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 text-slate-300 rounded-2xl font-bold">Cancel</button>
+                <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Save Question</button>
             </div>
         </form>
     `);
@@ -691,23 +800,16 @@ async function saveQuestion(e, id) {
         examId: selectedExamId,
         section: e.target.section.value,
         questionText: e.target.questionText.value,
-        options: [
-            e.target.option0.value,
-            e.target.option1.value,
-            e.target.option2.value,
-            e.target.option3.value
-        ],
+        options: [e.target.option0.value, e.target.option1.value, e.target.option2.value, e.target.option3.value],
         correctAnswer: parseInt(e.target.correctAnswer.value)
     };
     try {
-        const method = id ? 'PUT' : 'POST';
-        const url = id ? `/api/admin/questions/${id}` : '/api/admin/questions';
-        const res = await fetch(url, {
-            method,
+        const res = await fetch(id ? `/api/admin/questions/${id}` : '/api/admin/questions', {
+            method: id ? 'PUT' : 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(body)
         });
-        if (!res.ok) throw new Error('Failed to save question');
+        if (!res.ok) throw new Error('Question sync failed');
         closeModal();
         loadQuestions();
     } catch (err) {
@@ -715,30 +817,21 @@ async function saveQuestion(e, id) {
     }
 }
 
-async function deleteQuestion(id) {
-    if (!confirm('Delete this question?')) return;
-    try {
-        const res = await fetch(`/api/admin/questions/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-        if (!res.ok) throw new Error('Failed to delete');
-        loadQuestions();
-    } catch (err) {
-        alert(err.message);
-    }
-}
-
-// ── Bulk Upload ─────────────────────────────────────────────────────
-
 function openBulkModal() {
+    setModalTitle('Content Import (JSON)');
     showModal(`
-        <h2 class="text-2xl font-bold text-white mb-2">Bulk Upload</h2>
-        <p class="text-slate-400 text-sm mb-6">Paste JSON array of questions. Format:<br><code class="text-xs bg-black/30 p-1 block mt-2">[{"section": "...", "questionText": "...", "options": ["A","B","C","D"], "correctAnswer": 0}]</code></p>
-        <form onsubmit="handleBulkUpload(event)" class="space-y-4">
-            <textarea name="jsonContent" required rows="10" placeholder="[{...}]" class="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg outline-none text-white font-mono text-xs focus:border-primary-500"></textarea>
-            <div class="flex gap-3 pt-4">
-                <button type="button" onclick="closeModal()" class="flex-1 py-2 border border-dark-700 text-slate-300 rounded-lg">Cancel</button>
-                <button type="submit" class="flex-1 py-2 bg-primary-600 text-white rounded-lg font-bold">Upload All</button>
+        <div class="space-y-6">
+            <div class="p-6 bg-accent-500/5 border border-accent-500/10 rounded-2xl">
+                <code class="text-[10px] text-accent-400 block whitespace-pre">[\n  {\n    "section": "Verbal",\n    "questionText": "Question here?",\n    "options": ["A", "B", "C", "D"],\n    "correctAnswer": 0\n  }\n]</code>
             </div>
-        </form>
+            <form onsubmit="handleBulkUpload(event)" class="space-y-6">
+                <textarea name="jsonContent" required rows="10" placeholder="Paste question array..." class="w-full px-5 py-4 bg-dark-900 border border-slate-800 rounded-2xl outline-none text-white font-mono text-xs focus:ring-2 focus:ring-primary-500"></textarea>
+                <div class="flex gap-4">
+                    <button type="button" onclick="closeModal()" class="flex-1 py-4 bg-white/5 text-slate-300 rounded-2xl font-bold">Cancel</button>
+                    <button type="submit" class="flex-1 py-4 btn-primary text-white rounded-2xl font-bold shadow-lg">Start Import</button>
+                </div>
+            </form>
+        </div>
     `);
 }
 
@@ -756,14 +849,90 @@ async function handleBulkUpload(e) {
         closeModal();
         loadQuestions();
     } catch (err) {
-        alert('Invalid JSON or Upload Error: ' + err.message);
+        alert('Parsing Error: ' + err.message);
     }
 }
 
-// ── Misc ─────────────────────────────────────────────────────────────
+async function deleteQuestion(id) {
+    if (!confirm('Remove this question from the bank?')) return;
+    try {
+        const res = await fetch(`/api/admin/questions/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to delete');
+        loadQuestions();
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
+// ── Export Features ──────────────────────────────────────────────────
+
+function getSortedResults() {
+    return [...leaderboardData].sort((a, b) => a.rollNumber - b.rollNumber);
+}
+
+function downloadCSV() {
+    const data = getSortedResults();
+    if (data.length === 0) return alert('No data to export');
+    
+    const headers = ['Rank', 'Name', 'Roll Number', 'Email', 'Score', 'Total Questions', 'Submitted At'];
+    const rows = data.map(u => [
+        u.rank,
+        u.name,
+        u.rollNumber,
+        u.email,
+        u.totalScore,
+        window.totalQuestions,
+        new Date(u.submittedAt).toLocaleString()
+    ]);
+    
+    let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", `Results_${document.getElementById('detailExamTitle').textContent}_RollSorted.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const data = getSortedResults();
+    if (data.length === 0) return alert('No data to export');
+
+    const title = document.getElementById('detailExamTitle').textContent;
+    doc.setFontSize(20);
+    doc.text(title, 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Official Exam Results — Sorted by Roll Number`, 14, 30);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 36);
+
+    const rows = data.map(u => [
+        u.rollNumber,
+        u.name,
+        u.email,
+        u.totalScore,
+        window.totalQuestions,
+        new Date(u.submittedAt).toLocaleTimeString()
+    ]);
+
+    doc.autoTable({
+        startY: 45,
+        head: [['Roll No', 'Name', 'Email', 'Score', 'Total', 'Time']],
+        body: rows,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+    });
+
+    doc.save(`Results_${title}_RollSorted.pdf`);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
 
 async function clearUsers() {
-    if (!confirm('EXTREME DANGER: This will delete ALL results for this exam forever. Continue?')) return;
+    if (!confirm('EXTREME DANGER: Erase all student results for this exam?')) return;
     try {
         const res = await fetch(`/api/admin/users?examId=${selectedExamId}`, { method: 'DELETE', headers: getAuthHeaders() });
         const data = await res.json();
@@ -774,12 +943,17 @@ async function clearUsers() {
     }
 }
 
-// Modal Helpers
+function setModalTitle(text) {
+    document.getElementById('modalTitle').textContent = text;
+}
+
 function showModal(content) {
     document.getElementById('modalBody').innerHTML = content;
     document.getElementById('modalOverlay').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
     document.getElementById('modalOverlay').classList.add('hidden');
+    document.body.style.overflow = '';
 }

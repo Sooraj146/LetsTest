@@ -38,22 +38,35 @@ function getCollegeId(req) {
 // @route POST /api/admin/exams
 exports.createExam = async (req, res) => {
   try {
-    const { title, startTime, endTime } = req.body;
-    const collegeId = getCollegeId(req);
-
-    if (!title || !collegeId) {
-      return res.status(400).json({ message: 'Title and collegeId are required' });
+    const { title, startTime, endTime, collegeIds } = req.body;
+    
+    // If collegeIds is provided (array), create for all. Otherwise use single collegeId.
+    let targetColleges = [];
+    if (req.admin.role === 'main' && Array.isArray(collegeIds)) {
+      targetColleges = collegeIds;
+    } else {
+      const singleId = getCollegeId(req);
+      if (singleId) targetColleges = [singleId];
     }
+
+    if (!title || targetColleges.length === 0) {
+      return res.status(400).json({ message: 'Title and at least one collegeId are required' });
+    }
+    
     if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
       return res.status(400).json({ message: 'End time must be after start time' });
     }
-    const exam = await Exam.create({
-      title,
-      collegeId,
-      startTime: startTime || null,
-      endTime:   endTime   || null,
-    });
-    res.status(201).json(exam);
+
+    const exams = await Promise.all(targetColleges.map(cid => 
+      Exam.create({
+        title,
+        collegeId: cid,
+        startTime: startTime || null,
+        endTime:   endTime   || null,
+      })
+    ));
+
+    res.status(201).json(exams.length === 1 ? exams[0] : { message: `${exams.length} exams created.`, exams });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
