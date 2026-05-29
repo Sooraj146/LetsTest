@@ -44,7 +44,9 @@
             <p class="text-slate-400 text-sm mt-1">MCA Test — Admin Portal</p>
         </div>
         <div class="space-y-4">
-            <input type="password" id="adminPasswordInput" placeholder="Admin Password"
+            <input type="text" id="adminUsernameInput" placeholder="Username"
+                   class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 transition-all">
+            <input type="password" id="adminPasswordInput" placeholder="Password"
                    class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 transition-all">
             <div id="loginError" class="hidden bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-lg text-center"></div>
             <button id="loginBtn" onclick="adminLogin()"
@@ -63,12 +65,20 @@
     <header class="glass-panel border-b border-dark-700 px-4 md:px-6 py-3 md:py-4 flex justify-between items-center sticky top-0 z-30">
         <div class="flex items-center gap-2 md:gap-3">
             <span class="text-xl md:text-2xl font-bold text-white">MCA <span class="text-primary-500">Test</span></span>
-            <span class="px-2 py-0.5 text-xs font-semibold bg-accent/20 border border-accent/40 text-purple-300 rounded-full">Admin</span>
+            <span id="adminRoleBadge" class="px-2 py-0.5 text-xs font-semibold bg-accent/20 border border-accent/40 text-purple-300 rounded-full">Admin</span>
         </div>
-        <button onclick="adminLogout()" class="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm border border-dark-700 rounded-lg hover:bg-dark-800 text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 md:gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-            <span class="hidden sm:inline">Logout</span>
-        </button>
+        <div class="flex items-center gap-4">
+            <div id="collegeSelectorContainer" class="hidden items-center gap-2">
+                <span class="text-xs text-slate-500 uppercase font-semibold">College:</span>
+                <select id="globalCollegeSelector" onchange="onGlobalCollegeChange(this)"
+                    class="px-3 py-1.5 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-primary-500 outline-none">
+                </select>
+            </div>
+            <button onclick="adminLogout()" class="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm border border-dark-700 rounded-lg hover:bg-dark-800 text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 md:gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <span class="hidden sm:inline">Logout</span>
+            </button>
+        </div>
     </header>
 
     <!-- Exam Selector Bar -->
@@ -85,14 +95,19 @@
             New Exam
         </button>
     </div>
-    <!-- No-exam banner -->
-    <div id="noExamBanner" class="hidden bg-yellow-500/10 border-b border-yellow-500/30 px-6 py-3 text-yellow-400 text-sm text-center">
-        No exams found. Click <strong>New Exam</strong> above to create your first exam.
-    </div>
 
     <!-- Tab Navigation -->
     <div class="border-b border-dark-700 bg-dark-900/80 sticky top-[53px] md:top-[65px] z-20">
         <div class="flex px-4 md:px-6 gap-0 overflow-x-auto custom-scrollbar" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
+            <!-- Main Admin Specific Tabs -->
+            <button id="tabBtnColleges" class="tab-btn hidden" data-tab="colleges" onclick="switchTab('colleges')">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                Colleges
+            </button>
+            <button id="tabBtnAdmins" class="tab-btn hidden" data-tab="admins" onclick="switchTab('admins')">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                Admins
+            </button>
             <button class="tab-btn active-tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                 <span class="hidden sm:inline">Leaderboard</span>
@@ -104,24 +119,77 @@
             </button>
             <button class="tab-btn" data-tab="questions" onclick="switchTab('questions')">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span class="hidden sm:inline">Manage Questions</span>
-                <span class="sm:hidden">Questions</span>
+                <span class="hidden sm:inline">Questions</span>
             </button>
             <button class="tab-btn" data-tab="students" onclick="switchTab('students')">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                <span class="hidden sm:inline">Manage Students</span>
-                <span class="sm:hidden">Students</span>
+                <span class="hidden sm:inline">Students</span>
             </button>
             <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span class="hidden sm:inline">Exam Settings</span>
-                <span class="sm:hidden">Settings</span>
+                <span class="hidden sm:inline">Settings</span>
             </button>
         </div>
     </div>
 
     <!-- Tab Content -->
     <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+
+        <!-- ======= COLLEGES TAB (Main Admin only) ======= -->
+        <div id="tab-colleges" class="hidden">
+            <div class="glass-panel border border-dark-700 rounded-xl p-6 max-w-4xl mx-auto">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">College Management</h2>
+                        <p class="text-slate-400 text-sm">Add or manage colleges and their domains.</p>
+                    </div>
+                    <button onclick="openAddCollegeModal()"
+                            class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Add College
+                    </button>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-sm">
+                        <thead class="bg-dark-800/70">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Domain</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collegesTableBody" class="divide-y divide-dark-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======= ADMINS TAB (Main Admin only) ======= -->
+        <div id="tab-admins" class="hidden">
+            <div class="glass-panel border border-dark-700 rounded-xl p-6 max-w-4xl mx-auto">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Admin Accounts</h2>
+                        <p class="text-slate-400 text-sm">Create mini-admin accounts for specific colleges.</p>
+                    </div>
+                    <button onclick="openAddAdminModal()"
+                            class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Add Admin
+                    </button>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-sm">
+                        <thead class="bg-dark-800/70">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Username</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">College</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminsTableBody" class="divide-y divide-dark-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
         <!-- ======= LEADERBOARD TAB ======= -->
         <div id="tab-leaderboard">

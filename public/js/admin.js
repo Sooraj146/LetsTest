@@ -1,8 +1,9 @@
-// ================================================================
-// Admin Dashboard JavaScript
-// ================================================================
-
+let adminUsername = null;
 let adminPassword = null;
+let adminRole = null;
+let adminCollege = null; // { _id, name, domain }
+let selectedGlobalCollegeId = null;
+
 let allLeaderboard = [];
 let allAnalytics = [];
 let allAdminQuestions = [];
@@ -15,6 +16,8 @@ let selectedCorrectAnswer = null;
 let totalQuestionsGlobal = 0;
 let selectedExamId = null;   // currently selected exam
 let allExams = [];            // cached exam list
+let allColleges = [];
+let allAdminAccounts = [];
 
 // ----------------------------------------------------------------
 // HELPERS
@@ -24,6 +27,7 @@ const adminFetch = (url, options = {}) => {
         ...options,
         headers: {
             'Content-Type': 'application/json',
+            'x-admin-username': adminUsername,
             'x-admin-password': adminPassword,
             ...(options.headers || {}),
         },
@@ -34,54 +38,90 @@ const adminFetch = (url, options = {}) => {
 // AUTH
 // ----------------------------------------------------------------
 async function adminLogin() {
+    const username = document.getElementById('adminUsernameInput').value;
     const pwd = document.getElementById('adminPasswordInput').value;
     const errEl = document.getElementById('loginError');
     const btn = document.getElementById('loginBtn');
 
-    if (!pwd) { showLoginError('Please enter a password.'); return; }
+    if (!username || !pwd) { showLoginError('Please enter username and password.'); return; }
 
     btn.textContent = 'Checking...'; btn.disabled = true;
 
-    // Must set adminPassword BEFORE calling adminFetch,
-    // because adminFetch reads adminPassword to set the header.
-    adminPassword = pwd;
+    try {
+        const res = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password: pwd })
+        });
 
-    const res = await adminFetch('/api/admin/leaderboard', { method: 'GET' });
+        if (!res.ok) {
+            showLoginError('Invalid credentials. Please try again.');
+            btn.textContent = 'Login'; btn.disabled = false;
+            return;
+        }
 
-    if (res.status === 401) {
-        adminPassword = null; // reset on failure
-        showLoginError('Incorrect password. Please try again.');
+        const data = await res.json();
+        adminUsername = username;
+        adminPassword = pwd;
+        adminRole = data.role;
+        adminCollege = data.college;
+
+        sessionStorage.setItem('adminUsername', adminUsername);
+        sessionStorage.setItem('adminPassword', adminPassword);
+        sessionStorage.setItem('adminRole', adminRole);
+        sessionStorage.setItem('adminCollege', JSON.stringify(adminCollege));
+
+        initDashboard();
+    } catch (err) {
+        showLoginError('Server error. Please try again.');
         btn.textContent = 'Login'; btn.disabled = false;
-        return;
     }
+}
 
-    // Password is correct — save and show dashboard
-    sessionStorage.setItem('adminPassword', pwd);
+async function initDashboard() {
     document.getElementById('loginScreen').classList.add('hidden');
     const dash = document.getElementById('dashboard');
     dash.classList.remove('hidden');
     dash.classList.add('flex');
 
+    const roleBadge = document.getElementById('adminRoleBadge');
+    roleBadge.textContent = adminRole === 'main' ? 'Main Admin' : `Admin: ${adminCollege?.name}`;
+
+    if (adminRole === 'main') {
+        document.getElementById('tabBtnColleges').classList.remove('hidden');
+        document.getElementById('tabBtnAdmins').classList.remove('hidden');
+        document.getElementById('collegeSelectorContainer').classList.remove('hidden');
+        await loadColleges();
+        if (allColleges.length > 0) {
+            selectedGlobalCollegeId = allColleges[0]._id;
+            document.getElementById('globalCollegeSelector').value = selectedGlobalCollegeId;
+        }
+    } else {
+        selectedGlobalCollegeId = adminCollege?._id;
+        document.getElementById('collegeSelectorContainer').classList.add('hidden');
+    }
+
     await loadExamSelector();
 }
 
-// Try to restore session on load
 window.addEventListener('DOMContentLoaded', () => {
-    const saved = sessionStorage.getItem('adminPassword');
-    if (saved) {
-        adminPassword = saved;
-        document.getElementById('loginScreen').classList.add('hidden');
-        const dash = document.getElementById('dashboard');
-        dash.classList.remove('hidden');
-        dash.classList.add('flex');
-        loadExamSelector();
+    const savedU = sessionStorage.getItem('adminUsername');
+    const savedP = sessionStorage.getItem('adminPassword');
+    const savedR = sessionStorage.getItem('adminRole');
+    const savedC = sessionStorage.getItem('adminCollege');
+
+    if (savedU && savedP) {
+        adminUsername = savedU;
+        adminPassword = savedP;
+        adminRole = savedR;
+        adminCollege = savedC ? JSON.parse(savedC) : null;
+        initDashboard();
     }
 
     document.getElementById('adminPasswordInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') adminLogin();
     });
 
-    // Init option inputs for modal
     renderOptionInputs();
 });
 
@@ -92,8 +132,7 @@ function showLoginError(msg) {
 }
 
 function adminLogout() {
-    sessionStorage.removeItem('adminPassword');
-    adminPassword = null;
+    sessionStorage.clear();
     window.location.reload();
 }
 
@@ -103,9 +142,11 @@ function adminLogout() {
 let analyticsLoaded = false;
 let questionsLoaded = false;
 let studentsLoaded = false;
+let collegesLoaded = false;
+let adminsLoaded = false;
 
 function switchTab(tab) {
-    ['leaderboard', 'analytics', 'questions', 'students', 'settings'].forEach(t => {
+    ['leaderboard', 'analytics', 'questions', 'students', 'settings', 'colleges', 'admins'].forEach(t => {
         const el = document.getElementById(`tab-${t}`);
         if (el) el.classList.add('hidden');
     });
@@ -115,11 +156,114 @@ function switchTab(tab) {
     const tabEl = document.getElementById(`tab-${tab}`);
     if (tabEl) tabEl.classList.remove('hidden');
 
-    // Reset loaded flags when switching exams
     if (tab === 'analytics' && !analyticsLoaded) { loadAnalytics(); analyticsLoaded = true; }
     if (tab === 'questions' && !questionsLoaded)  { loadAdminQuestions(); questionsLoaded = true; }
     if (tab === 'students' && !studentsLoaded)   { loadStudents(); studentsLoaded = true; }
+    if (tab === 'colleges' && !collegesLoaded)   { loadColleges(); collegesLoaded = true; }
+    if (tab === 'admins' && !adminsLoaded)      { loadAdminAccounts(); adminsLoaded = true; }
     if (tab === 'settings') { renderExamSettingsTab(); }
+}
+
+// ----------------------------------------------------------------
+// COLLEGE & ADMIN MANAGEMENT (Main Admin only)
+// ----------------------------------------------------------------
+async function loadColleges() {
+    const res = await adminFetch('/api/admin/colleges');
+    if (res.ok) {
+        allColleges = await res.json();
+        const selector = document.getElementById('globalCollegeSelector');
+        selector.innerHTML = allColleges.map(c => `<option value="${c._id}">${c.name}</option>`).join('');
+        if (selectedGlobalCollegeId) selector.value = selectedGlobalCollegeId;
+        renderCollegesTable();
+    }
+}
+
+function renderCollegesTable() {
+    const tbody = document.getElementById('collegesTableBody');
+    tbody.innerHTML = allColleges.map(c => `
+        <tr class="hover:bg-dark-800/50 transition-colors">
+            <td class="px-4 py-3 font-medium text-white">${c.name}</td>
+            <td class="px-4 py-3 text-slate-400 font-mono text-xs">${c.domain}</td>
+        </tr>
+    `).join('');
+}
+
+function onGlobalCollegeChange(select) {
+    selectedGlobalCollegeId = select.value;
+    selectedExamId = null;
+    loadExamSelector();
+}
+
+function openAddCollegeModal() {
+    document.getElementById('newCollegeName').value = '';
+    document.getElementById('newCollegeDomain').value = '';
+    document.getElementById('addCollegeError').classList.add('hidden');
+    document.getElementById('addCollegeModal').classList.remove('hidden');
+    document.getElementById('addCollegeModal').classList.add('flex');
+}
+
+function closeAddCollegeModal() {
+    document.getElementById('addCollegeModal').classList.add('hidden');
+}
+
+async function confirmAddCollege() {
+    const name = document.getElementById('newCollegeName').value.trim();
+    const domain = document.getElementById('newCollegeDomain').value.trim();
+    const errEl = document.getElementById('addCollegeError');
+
+    if (!name || !domain) { showError(errEl, 'All fields required.'); return; }
+
+    const res = await adminFetch('/api/admin/colleges', {
+        method: 'POST',
+        body: JSON.stringify({ name, domain })
+    });
+
+    if (res.ok) {
+        closeAddCollegeModal();
+        await loadColleges();
+    } else {
+        const data = await res.json();
+        showError(errEl, data.message);
+    }
+}
+
+async function loadAdminAccounts() {
+    // Note: We need an endpoint to list accounts, but for now we'll skip or assume create only
+}
+
+function openAddAdminModal() {
+    const select = document.getElementById('newAdminCollege');
+    select.innerHTML = allColleges.map(c => `<option value="${c._id}">${c.name}</option>`).join('');
+    document.getElementById('newAdminUsername').value = '';
+    document.getElementById('newAdminPassword').value = '';
+    document.getElementById('addAdminError').classList.add('hidden');
+    document.getElementById('addAdminModal').classList.remove('hidden');
+    document.getElementById('addAdminModal').classList.add('flex');
+}
+
+function closeAddAdminModal() {
+    document.getElementById('addAdminModal').classList.add('hidden');
+}
+
+async function confirmAddAdmin() {
+    const username = document.getElementById('newAdminUsername').value.trim();
+    const password = document.getElementById('newAdminPassword').value.trim();
+    const collegeId = document.getElementById('newAdminCollege').value;
+    const errEl = document.getElementById('addAdminError');
+
+    if (!username || !password || !collegeId) { showError(errEl, 'All fields required.'); return; }
+
+    const res = await adminFetch('/api/admin/accounts', {
+        method: 'POST',
+        body: JSON.stringify({ username, password, collegeId })
+    });
+
+    if (res.ok) {
+        closeAddAdminModal();
+    } else {
+        const data = await res.json();
+        showError(errEl, data.message);
+    }
 }
 
 // ----------------------------------------------------------------
@@ -128,7 +272,8 @@ function switchTab(tab) {
 let allStudents = [];
 
 async function loadStudents() {
-    const res = await adminFetch('/api/admin/students');
+    if (!selectedGlobalCollegeId) return;
+    const res = await adminFetch(`/api/admin/students?collegeId=${selectedGlobalCollegeId}`);
     if (res.ok) {
         allStudents = await res.json();
         renderStudents();
@@ -165,9 +310,7 @@ function openAddStudentModal() {
 }
 
 function closeAddStudentModal() {
-    const modal = document.getElementById('addStudentModal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+    document.getElementById('addStudentModal').classList.add('hidden');
 }
 
 async function confirmAddStudent() {
@@ -175,15 +318,11 @@ async function confirmAddStudent() {
     const name = document.getElementById('newStudentName').value.trim();
     const errEl = document.getElementById('addStudentError');
 
-    if (!roll || !name) {
-        errEl.textContent = 'Roll number and name are required.';
-        errEl.classList.remove('hidden');
-        return;
-    }
+    if (!roll || !name) { showError(errEl, 'Roll number and name are required.'); return; }
 
     const res = await adminFetch('/api/admin/students', {
         method: 'POST',
-        body: JSON.stringify({ rollNumber: Number(roll), name })
+        body: JSON.stringify({ rollNumber: Number(roll), name, collegeId: selectedGlobalCollegeId })
     });
 
     if (res.ok) {
@@ -191,8 +330,7 @@ async function confirmAddStudent() {
         await loadStudents();
     } else {
         const data = await res.json();
-        errEl.textContent = data.message || 'Failed to add student.';
-        errEl.classList.remove('hidden');
+        showError(errEl, data.message);
     }
 }
 
@@ -220,13 +358,11 @@ async function loadLeaderboard() {
 }
 
 function renderLeaderboard(data) {
-    // ---- Dynamically extract section names from submitted data ----
     const sectionSet = new Set();
     data.forEach(u => Object.keys(u.sectionScores || {}).forEach(s => sectionSet.add(s)));
     const sections = [...sectionSet];
-    const colCount = 3 + sections.length + 1; // Rank + Student + Roll + sections + Total
+    const colCount = 3 + sections.length + 1;
 
-    // ---- Rebuild thead dynamically ----
     const thL = 'px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider';
     const thC = 'px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider';
     document.getElementById('leaderboardHead').innerHTML = `<tr>
@@ -237,7 +373,6 @@ function renderLeaderboard(data) {
         <th class="${thC}">Total</th>
     </tr>`;
 
-    // ---- Stat cards ----
     document.getElementById('statTotal').textContent = data.length;
     const passThreshold = totalQuestionsGlobal > 0 ? Math.ceil(totalQuestionsGlobal / 2) : null;
     if (passThreshold !== null) {
@@ -250,15 +385,13 @@ function renderLeaderboard(data) {
         return;
     }
 
-    if (data.length > 0) {
-        const avg = (data.reduce((s, u) => s + u.totalScore, 0) / data.length).toFixed(1);
-        const high = data[0].totalScore;
-        const passed = passThreshold !== null ? data.filter(u => u.totalScore >= passThreshold).length : 0;
-        document.getElementById('statAvg').textContent = avg;
-        document.getElementById('statHigh').textContent = high;
-        document.getElementById('statPass').textContent =
-            data.length > 0 ? Math.round((passed / data.length) * 100) + '%' : '--';
-    }
+    const avg = (data.reduce((s, u) => s + u.totalScore, 0) / data.length).toFixed(1);
+    const high = data[0].totalScore;
+    const passed = passThreshold !== null ? data.filter(u => u.totalScore >= passThreshold).length : 0;
+    document.getElementById('statAvg').textContent = avg;
+    document.getElementById('statHigh').textContent = high;
+    document.getElementById('statPass').textContent =
+        data.length > 0 ? Math.round((passed / data.length) * 100) + '%' : '--';
 
     const medals = ['🥇', '🥈', '🥉'];
     const passGreen  = totalQuestionsGlobal > 0 ? Math.ceil(totalQuestionsGlobal * 0.8) : Infinity;
@@ -281,6 +414,364 @@ function renderLeaderboard(data) {
             </td>
         </tr>`).join('');
 }
+
+function filterTable(query) {
+    const q = query.toLowerCase();
+    const filtered = allLeaderboard.filter(u =>
+        u.name.toLowerCase().includes(q) || String(u.rollNumber).toLowerCase().includes(q)
+    );
+    renderLeaderboard(filtered);
+}
+
+// ----------------------------------------------------------------
+// ANALYTICS
+// ----------------------------------------------------------------
+async function loadAnalytics() {
+    if (!selectedExamId) return;
+    const res = await adminFetch(`/api/admin/analytics?examId=${selectedExamId}`);
+    allAnalytics = await res.json();
+
+    const sections = [...new Set(allAnalytics.map(a => a.section))];
+    const filterContainer = document.getElementById('sectionFilterBtns');
+    filterContainer.innerHTML = sections.map(s => `
+        <button class="filter-pill ${s === sections[0] ? 'active-pill' : ''}"
+                onclick="switchAnalyticsSection('${s}', this)">${s}</button>
+    `).join('');
+
+    if (sections.length) switchAnalyticsSection(sections[0], filterContainer.querySelector('.active-pill'));
+}
+
+function switchAnalyticsSection(section, btn) {
+    activeAnalyticsSection = section;
+    document.querySelectorAll('#sectionFilterBtns .filter-pill').forEach(b => b.classList.remove('active-pill'));
+    btn.classList.add('active-pill');
+    renderAnalyticsChart(section);
+    renderAnalyticsTable(section);
+}
+
+function renderAnalyticsChart(section) {
+    const data = allAnalytics.filter(a => a.section === section);
+    const labels = data.map((_, i) => `Q${i + 1}`);
+    const correct = data.map(d => d.correctCount);
+    const wrong   = data.map(d => d.wrongCount);
+    const skip    = data.map(d => d.unattemptedCount);
+
+    document.getElementById('analyticsTitle').textContent = `${section} — Per-Question Performance`;
+    if (analyticsChart) analyticsChart.destroy();
+
+    const ctx = document.getElementById('analyticsChart').getContext('2d');
+    analyticsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Correct',  data: correct, backgroundColor: 'rgba(16,185,129,0.8)', borderRadius: 4, borderSkipped: false },
+                { label: 'Wrong',    data: wrong,   backgroundColor: 'rgba(239,68,68,0.8)',   borderRadius: 4, borderSkipped: false },
+                { label: 'Skipped',  data: skip,    backgroundColor: 'rgba(71,85,105,0.6)',   borderRadius: 4, borderSkipped: false },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } },
+                tooltip: { callbacks: { title: (i) => {
+                    const q = data[i[0].dataIndex];
+                    return q ? q.questionText.substring(0, 60) + '...' : '';
+                }}}
+            },
+            scales: {
+                x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.5)' } },
+                y: { stacked: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(51,65,85,0.5)' } }
+            }
+        }
+    });
+}
+
+function renderAnalyticsTable(section) {
+    const data = allAnalytics.filter(a => a.section === section);
+    const tbody = document.getElementById('analyticsBody');
+    if (!data.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-slate-500">No data yet.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = data.map((d, i) => {
+        const pct = d.totalStudents > 0 ? Math.round((d.correctCount / d.totalStudents) * 100) : 0;
+        return `
+        <tr class="hover:bg-dark-800/40 transition-colors">
+            <td class="px-4 py-3 text-slate-300 max-w-xs">
+                <span class="text-slate-500 mr-2 font-mono text-xs">Q${i + 1}</span>${d.questionText.substring(0, 80)}...
+            </td>
+            <td class="px-4 py-3 text-center text-emerald-400 font-semibold">${d.correctCount}</td>
+            <td class="px-4 py-3 text-center text-red-400 font-semibold">${d.wrongCount}</td>
+            <td class="px-4 py-3 text-center text-slate-500">${d.unattemptedCount}</td>
+            <td class="px-4 py-3 text-center">
+                <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold ${
+                    pct >= 70 ? 'bg-emerald-500/20 text-emerald-400' :
+                    pct >= 40 ? 'bg-yellow-500/20 text-yellow-400' :
+                    'bg-red-500/20 text-red-400'
+                }">${pct}%</span>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// ----------------------------------------------------------------
+// QUESTION MANAGEMENT
+// ----------------------------------------------------------------
+async function loadAdminQuestions() {
+    if (!selectedExamId) return;
+    const res = await adminFetch(`/api/admin/questions?examId=${selectedExamId}`);
+    allAdminQuestions = await res.json();
+    renderSectionFilter();
+    renderQuestions('All');
+}
+
+function renderSectionFilter() {
+    const sections = ['All', ...new Set(allAdminQuestions.map(q => q.section))];
+    const el = document.getElementById('qSectionFilter');
+    el.innerHTML = sections.map(s => `
+        <button class="filter-pill ${s === activeQSection ? 'active-pill' : ''}"
+                onclick="filterQuestions('${s}', this)">${s}</button>
+    `).join('');
+    const dl = document.getElementById('sectionsList');
+    dl.innerHTML = [...new Set(allAdminQuestions.map(q => q.section))]
+        .map(s => `<option value="${s}">`).join('');
+}
+
+function filterQuestions(section, btn) {
+    activeQSection = section;
+    document.querySelectorAll('#qSectionFilter .filter-pill').forEach(b => b.classList.remove('active-pill'));
+    btn.classList.add('active-pill');
+    renderQuestions(section);
+}
+
+function renderQuestions(section) {
+    const filtered = section === 'All' ? allAdminQuestions : allAdminQuestions.filter(q => q.section === section);
+    const container = document.getElementById('questionsList');
+
+    if (!filtered.length) {
+        container.innerHTML = `<p class="text-slate-500 text-center py-10">No questions found.</p>`;
+        return;
+    }
+
+    const grouped = {};
+    filtered.forEach(q => {
+        if (!grouped[q.section]) grouped[q.section] = [];
+        grouped[q.section].push(q);
+    });
+
+    const badgeColors = [
+        'bg-primary-600/20 text-primary-400 border-primary-500/30',
+        'bg-violet-600/20 text-violet-400 border-violet-500/30',
+        'bg-emerald-600/20 text-emerald-400 border-emerald-500/30',
+        'bg-amber-600/20 text-amber-400 border-amber-500/30',
+        'bg-rose-600/20 text-rose-400 border-rose-500/30',
+        'bg-cyan-600/20 text-cyan-400 border-cyan-500/30',
+    ];
+    const headerColors = [
+        'text-primary-400', 'text-violet-400', 'text-emerald-400', 'text-amber-400', 'text-rose-400', 'text-cyan-400',
+    ];
+
+    container.innerHTML = Object.keys(grouped).map((sec, secIdx) => {
+        const colorIdx = secIdx % badgeColors.length;
+        const qs = grouped[sec];
+
+        const questionCards = qs.map((q, qIdx) => `
+            <div class="glass-panel border border-dark-700 rounded-xl p-5 hover:border-dark-600 transition-colors">
+                <div class="flex justify-between items-start gap-4">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xs font-mono text-slate-500">Q${qIdx + 1}</span>
+                            <span class="inline-block px-2 py-0.5 text-xs font-semibold ${badgeColors[colorIdx]} border rounded-full">${q.section}</span>
+                        </div>
+                        <p class="text-white font-medium text-sm leading-relaxed">${q.questionText}</p>
+                        <div class="mt-3 grid grid-cols-2 gap-2">
+                            ${q.options.map(opt => `
+                                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg ${opt === q.correctAnswer ? 'bg-emerald-500/15 border border-emerald-500/40' : 'bg-dark-800/60 border border-dark-700'}">
+                                    ${opt === q.correctAnswer
+                                        ? `<svg class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`
+                                        : `<span class="w-3.5 h-3.5 flex-shrink-0"></span>`}
+                                    <span class="text-xs ${opt === q.correctAnswer ? 'text-emerald-300 font-semibold' : 'text-slate-400'} truncate">${opt}</span>
+                                </div>`).join('')}
+                        </div>
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                        <button onclick="openQuestionModal('${q._id}')" class="p-2 rounded-lg border border-dark-600 hover:bg-dark-700 text-slate-400 hover:text-white transition-colors" title="Edit">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                        <button onclick="openDeleteModal('${q._id}')" class="p-2 rounded-lg border border-red-500/30 hover:bg-red-500/20 text-red-400 transition-colors" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>`).join('');
+
+        return `
+            <div class="mb-8">
+                <div class="flex items-center gap-3 mb-3 pb-2 border-b border-dark-700">
+                    <h3 class="font-semibold text-base ${headerColors[colorIdx]}">${sec}</h3>
+                    <span class="ml-auto text-xs text-slate-500 font-mono">${qs.length} question${qs.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div class="space-y-3 pl-1">${questionCards}</div>
+            </div>`;
+    }).join('');
+}
+
+// ----------------------------------------------------------------
+// QUESTION MODAL
+// ----------------------------------------------------------------
+function renderOptionInputs(options = ['', '', '', ''], correctAnswer = null) {
+    selectedCorrectAnswer = correctAnswer;
+    const container = document.getElementById('optionsForm');
+    container.innerHTML = options.map((opt, i) => `
+        <div class="flex items-center gap-3">
+            <input type="radio" name="correctOpt" id="radio_${i}" class="radio-custom"
+                   ${selectedCorrectAnswer === opt && opt !== '' ? 'checked' : ''}
+                   onchange="selectedCorrectAnswer = document.getElementById('optInput_${i}').value">
+            <input type="text" id="optInput_${i}" value="${opt}" placeholder="Option ${i + 1}"
+                   class="flex-1 px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg focus:ring-1 focus:ring-primary-500 outline-none text-white placeholder-slate-500 text-sm"
+                   oninput="if(document.getElementById('radio_${i}').checked) selectedCorrectAnswer = this.value">
+        </div>`).join('');
+}
+
+function openQuestionModal(id) {
+    editingQuestionId = id;
+    document.getElementById('modalError').classList.add('hidden');
+    if (!id) {
+        document.getElementById('modalTitle').textContent = 'Add New Question';
+        document.getElementById('mSection').value = '';
+        document.getElementById('mQuestion').value = '';
+        renderOptionInputs();
+    } else {
+        const q = allAdminQuestions.find(q => q._id === id);
+        document.getElementById('modalTitle').textContent = 'Edit Question';
+        document.getElementById('mSection').value = q.section;
+        document.getElementById('mQuestion').value = q.questionText;
+        renderOptionInputs(q.options, q.correctAnswer);
+    }
+    const modal = document.getElementById('questionModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeQuestionModal() {
+    document.getElementById('questionModal').classList.add('hidden');
+    editingQuestionId = null;
+    selectedCorrectAnswer = null;
+}
+
+async function saveQuestion() {
+    const section       = document.getElementById('mSection').value.trim();
+    const questionText  = document.getElementById('mQuestion').value.trim();
+    const options       = [0,1,2,3].map(i => document.getElementById(`optInput_${i}`).value.trim());
+    const correctAnswer = selectedCorrectAnswer?.trim() || options.find((_, i) => document.getElementById(`radio_${i}`).checked);
+
+    const errEl = document.getElementById('modalError');
+    if (!section || !questionText || options.some(o => !o) || !correctAnswer) {
+        showError(errEl, 'All fields required and a correct answer must be selected.'); return;
+    }
+
+    const btn = document.getElementById('modalSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    const body = JSON.stringify({ examId: selectedExamId, section, questionText, options, correctAnswer });
+    const url  = editingQuestionId ? `/api/admin/questions/${editingQuestionId}` : '/api/admin/questions';
+    const method = editingQuestionId ? 'PUT' : 'POST';
+
+    const res = await adminFetch(url, { method, body });
+    btn.disabled = false; btn.textContent = 'Save';
+
+    if (!res.ok) { showError(errEl, (await res.json()).message); return; }
+
+    closeQuestionModal();
+    questionsLoaded = false;
+    await loadAdminQuestions();
+}
+
+// ----------------------------------------------------------------
+// EXAM SELECTOR
+// ----------------------------------------------------------------
+async function loadExamSelector() {
+    if (!selectedGlobalCollegeId) return;
+    const res = await fetch(`/api/exams?collegeId=${selectedGlobalCollegeId}`);
+    allExams = res.ok ? await res.json() : [];
+
+    renderExamSelectorBar();
+
+    const initial = allExams[0]?._id;
+    if (initial) {
+        selectExam(initial);
+    } else {
+        selectedExamId = null;
+        document.getElementById('activeExamLabel').textContent = 'No exams';
+        renderLeaderboard([]);
+    }
+}
+
+function renderExamSelectorBar() {
+    const select = document.getElementById('examSelectorDropdown');
+    if (!select) return;
+    select.innerHTML = allExams.length
+        ? allExams.map(e => `<option value="${e._id}" ${e._id === selectedExamId ? 'selected' : ''}>${e.title}</option>`).join('')
+        : '<option value="">No exams yet</option>';
+}
+
+function selectExam(examId) {
+    selectedExamId = examId;
+    analyticsLoaded = false;
+    questionsLoaded = false;
+    allLeaderboard  = [];
+    allAnalytics    = [];
+    allAdminQuestions = [];
+
+    const exam = allExams.find(e => e._id === examId);
+    if (exam) document.getElementById('activeExamLabel').textContent = exam.title;
+    loadLeaderboard();
+}
+
+function onExamSelectorChange(select) { if (select.value) selectExam(select.value); }
+
+function openCreateExamModal() {
+    document.getElementById('newExamTitle').value = '';
+    document.getElementById('newExamStart').value = '';
+    document.getElementById('newExamEnd').value   = '';
+    document.getElementById('createExamError').classList.add('hidden');
+    document.getElementById('createExamModal').classList.remove('hidden');
+    document.getElementById('createExamModal').classList.add('flex');
+}
+
+function closeCreateExamModal() { document.getElementById('createExamModal').classList.add('hidden'); }
+
+async function confirmCreateExam() {
+    const title = document.getElementById('newExamTitle').value.trim();
+    const startVal = document.getElementById('newExamStart').value;
+    const endVal = document.getElementById('newExamEnd').value;
+    const errEl = document.getElementById('createExamError');
+
+    if (!title || !selectedGlobalCollegeId) { showError(errEl, 'Title required.'); return; }
+
+    const res = await adminFetch('/api/admin/exams', {
+        method: 'POST',
+        body: JSON.stringify({ title, collegeId: selectedGlobalCollegeId, startTime: startVal ? new Date(startVal).toISOString() : null, endTime: endVal ? new Date(endVal).toISOString() : null })
+    });
+
+    if (res.ok) {
+        const exam = await res.json();
+        allExams.unshift(exam);
+        renderExamSelectorBar();
+        closeCreateExamModal();
+        selectExam(exam._id);
+        switchTab('settings');
+    } else {
+        showError(errEl, (await res.json()).message);
+    }
+}
+
+// ----------------------------------------------------------------
+// UTILS
+// ----------------------------------------------------------------
+function showError(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+function escHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function filterTable(query) {
     const q = query.toLowerCase();

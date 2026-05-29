@@ -9,8 +9,15 @@ const studentSchema = new mongoose.Schema({
   rollNumber: {
     type: Number,
     required: true,
-    unique: true,
+  },
+  collegeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'College',
+    required: true,
+    index: true,
   },
 }, { timestamps: true });
+
+studentSchema.index({ rollNumber: 1, collegeId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Student', studentSchema);

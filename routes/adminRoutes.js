@@ -19,9 +19,25 @@ const {
   updateExam,
   deleteExam,
 } = require('../controllers/examController');
+const {
+  login,
+  createCollege,
+  getColleges,
+  createAdminAccount
+} = require('../controllers/authController');
 
 const router = express.Router();
+
+// Public admin routes (login)
+router.post('/login', login);
+
 router.use(adminAuth);
+
+// ── Management (Main Admin only) ───────────────────────────────────
+router.get('/colleges',    getColleges);
+router.post('/colleges',   createCollege);
+router.get('/accounts',    require('../controllers/authController').getAdminAccounts);
+router.post('/accounts',   createAdminAccount);
 
 // ── Student management ─────────────────────────────────────────────
 router.get('/students',     getStudents);

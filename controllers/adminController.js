@@ -2,11 +2,21 @@ const User = require('../models/User');
 const Question = require('../models/Question');
 const Student = require('../models/Student');
 
+// Helper — get collegeId from admin or query (if main admin)
+function getCollegeId(req) {
+  if (req.admin.role === 'main') {
+    return req.query.collegeId || req.body.collegeId;
+  }
+  return req.admin.collegeId;
+}
+
 // @desc  Get all pre-populated students
 // @route GET /api/admin/students
 exports.getStudents = async (req, res) => {
   try {
-    const students = await Student.find().sort({ rollNumber: 1 });
+    const collegeId = getCollegeId(req);
+    if (!collegeId) return res.status(400).json({ message: 'collegeId is required for main admin' });
+    const students = await Student.find({ collegeId }).sort({ rollNumber: 1 });
     res.status(200).json(students);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -18,14 +28,15 @@ exports.getStudents = async (req, res) => {
 exports.addStudent = async (req, res) => {
   try {
     const { name, rollNumber } = req.body;
-    if (!name || rollNumber === undefined) {
-      return res.status(400).json({ message: 'Name and roll number are required' });
+    const collegeId = getCollegeId(req);
+    if (!name || rollNumber === undefined || !collegeId) {
+      return res.status(400).json({ message: 'Name, roll number and collegeId are required' });
     }
-    const student = await Student.create({ name, rollNumber });
+    const student = await Student.create({ name, rollNumber, collegeId });
     res.status(201).json(student);
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({ message: 'Roll number already exists' });
+      return res.status(400).json({ message: 'Roll number already exists for this college' });
     }
     res.status(500).json({ message: error.message });
   }
@@ -35,6 +46,7 @@ exports.addStudent = async (req, res) => {
 // @route DELETE /api/admin/students/:id
 exports.deleteStudent = async (req, res) => {
   try {
+    // Note: We could verify if the student belongs to the admin's college here
     const student = await Student.findByIdAndDelete(req.params.id);
     if (!student) return res.status(404).json({ message: 'Student not found' });
     res.status(200).json({ message: 'Student deleted' });

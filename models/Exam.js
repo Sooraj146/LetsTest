@@ -20,6 +20,12 @@ const examSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  collegeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'College',
+    required: true,
+    index: true,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Exam', examSchema);

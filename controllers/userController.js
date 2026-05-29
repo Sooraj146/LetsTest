@@ -4,28 +4,47 @@ const Exam = require('../models/Exam');
 const Student = require('../models/Student');
 
 // @desc    Get student name by roll number
-// @route   GET /api/users/student/:rollNumber
+// @route   GET /api/users/student/:rollNumber?collegeId=xxx&domain=xxx
 exports.getStudentByRoll = async (req, res) => {
   try {
     let roll = Number(req.params.rollNumber);
+    let collegeId = req.query.collegeId;
+    const domain = req.query.domain;
+
     if (isNaN(roll)) return res.status(400).json({ message: 'Invalid roll number' });
+
+    if (!collegeId && domain) {
+      const college = await College.findOne({ domain });
+      if (!college) return res.status(404).json({ message: 'College domain not registered' });
+      collegeId = college._id;
+    }
+
+    if (!collegeId) return res.status(400).json({ message: 'College ID or Domain is required' });
 
     // Negative roll number logic: absolute value represents the name
     const absRoll = Math.abs(roll);
-    const student = await Student.findOne({ rollNumber: absRoll });
+    const student = await Student.findOne({ rollNumber: absRoll, collegeId });
 
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.status(200).json(student);
+    if (!student) return res.status(404).json({ message: 'Student not found in this college' });
+    
+    // Return student name AND collegeId for the frontend
+    res.status(200).json({
+      name: student.name,
+      collegeId: student.collegeId
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
 // @desc    Get all exams categorized by status
-// @route   GET /api/users/exams
+// @route   GET /api/users/exams?collegeId=xxx
 exports.getExams = async (req, res) => {
   try {
-    const exams = await Exam.find().sort({ startTime: -1 });
+    const { collegeId } = req.query;
+    if (!collegeId) return res.status(400).json({ message: 'College ID is required' });
+
+    const exams = await Exam.find({ collegeId }).sort({ startTime: -1 });
     const now = new Date();
 
     const result = {
@@ -60,22 +79,31 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide roll number, email and examId' });
     }
 
-    // --- Fetch name from Student master list ---
-    const roll = Number(rollNumber);
-    const absRoll = Math.abs(roll);
-    const student = await Student.findOne({ rollNumber: absRoll });
-    if (!student) {
-      return res.status(404).json({ message: 'Student roll number not found in master list' });
-    }
-    const name = student.name;
-
     // --- Load exam ---
     const exam = await Exam.findById(examId);
     if (!exam) return res.status(404).json({ message: 'Exam not found' });
 
-    // --- Email domain validation ---
+    // --- Identify College by Email Domain ---
     const emailLower = email.toLowerCase();
-    // (Removed domain restrictions as requested)
+    const emailDomain = '@' + emailLower.split('@')[1];
+    const college = await College.findOne({ domain: emailDomain });
+    if (!college) {
+      return res.status(400).json({ message: 'Your college is not registered on this platform.' });
+    }
+
+    // Check if exam belongs to this college
+    if (exam.collegeId.toString() !== college._id.toString()) {
+      return res.status(403).json({ message: 'This exam is not available for your college.' });
+    }
+
+    // --- Fetch name from Student master list ---
+    const roll = Number(rollNumber);
+    const absRoll = Math.abs(roll);
+    const student = await Student.findOne({ rollNumber: absRoll, collegeId: college._id });
+    if (!student) {
+      return res.status(404).json({ message: 'Student roll number not found for your college.' });
+    }
+    const name = student.name;
 
     // --- Check for existing registration for THIS exam ---
     const byRoll = await User.findOne({ rollNumber, examId });
@@ -104,7 +132,7 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'This email is already registered with a different roll number for this exam' });
     }
 
-    const user = await User.create({ name, rollNumber, email: emailLower, examId });
+    const user = await User.create({ name, rollNumber, email: emailLower, examId, collegeId: college._id });
 
     res.status(201).json({
       _id: user._id,

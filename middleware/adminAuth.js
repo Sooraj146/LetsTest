@@ -1,13 +1,26 @@
-/**
- * Admin authentication middleware.
- * Checks the x-admin-password header against the ADMIN_PASSWORD env variable.
- */
-const adminAuth = (req, res, next) => {
+const AdminAccount = require('../models/AdminAccount');
+const College = require('../models/College');
+
+const adminAuth = async (req, res, next) => {
+  const username = req.headers['x-admin-username'];
   const password = req.headers['x-admin-password'];
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ message: 'Unauthorized: Invalid admin password' });
+
+  if (!username || !password) {
+    return res.status(401).json({ message: 'Unauthorized: Missing credentials' });
   }
-  next();
+
+  try {
+    const admin = await AdminAccount.findOne({ username, password });
+    if (!admin) {
+      return res.status(401).json({ message: 'Unauthorized: Invalid credentials' });
+    }
+
+    // Attach admin info to request
+    req.admin = admin;
+    next();
+  } catch (error) {
+    res.status(500).json({ message: 'Server error during authentication' });
+  }
 };
 
 module.exports = adminAuth;
