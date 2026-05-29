@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCA Test - Online Assessment</title>
+    <title>MCA Test — Exam Portal</title>
+    <meta name="description" content="Online aptitude test portal for MCA students of GEC Thrissur and RIT Kottayam.">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -11,19 +12,20 @@
             theme: {
                 extend: {
                     colors: {
-                        dark: {
-                            900: '#0f172a',
-                            800: '#1e293b',
-                            700: '#334155',
-                        },
-                        primary: {
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                        },
+                        dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155', 600: '#475569' },
+                        primary: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' },
                         accent: '#8b5cf6'
                     },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    keyframes: {
+                        blob: { '0%,100%': { transform: 'translate(0,0) scale(1)' }, '33%': { transform: 'translate(30px,-50px) scale(1.1)' }, '66%': { transform: 'translate(-20px,20px) scale(0.9)' } },
+                        fadeIn: { from: { opacity: '0', transform: 'translateY(12px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+                        pulse2: { '0%,100%': { opacity: '1' }, '50%': { opacity: '.5' } },
+                    },
+                    animation: {
+                        blob: 'blob 7s infinite',
+                        'fade-in': 'fadeIn 0.4s ease both',
+                        'pulse2': 'pulse2 2s cubic-bezier(0.4,0,0.6,1) infinite',
                     }
                 }
             }
@@ -31,51 +33,145 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+        .glass-panel { background: rgba(30,41,59,0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
+        .exam-card { transition: all 0.25s ease; }
+        .exam-card:hover { transform: translateY(-2px); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    </style>
 </head>
-<body class="bg-dark-900 text-slate-200 font-sans min-h-[100dvh] flex items-center justify-center relative overflow-hidden p-4">
-    <!-- Background Decoration -->
-    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
+<body class="bg-dark-900 text-slate-200 font-sans min-h-[100dvh] flex items-center justify-center relative overflow-x-hidden p-4">
+
+    <!-- Animated background -->
+    <div class="absolute inset-0 overflow-hidden -z-10">
         <div class="absolute -top-40 -right-40 w-96 h-96 bg-primary-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
         <div class="absolute top-40 -left-40 w-96 h-96 bg-accent rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
         <div class="absolute -bottom-40 left-20 w-96 h-96 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
     </div>
 
-    <div class="glass-panel w-full max-w-md p-6 md:p-8 rounded-2xl shadow-2xl relative z-10 transition-all duration-500 md:hover:scale-[1.02]">
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- PANEL 1 — Student Details Form                             -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="detailsPanel" class="glass-panel w-full max-w-md p-6 md:p-8 rounded-2xl shadow-2xl relative z-10 animate-fade-in">
+
         <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-white mb-2 tracking-tight">MCA <span class="text-primary-500">Test</span></h1>
-            <p class="text-slate-400 text-sm">Enter your details to begin the assessment</p>
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-600/20 border border-primary-500/30 mb-4">
+                <svg class="w-7 h-7 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-white tracking-tight">MCA <span class="text-primary-400">Test Portal</span></h1>
+            <p class="text-slate-400 text-sm mt-1">Enter your details to view available exams</p>
         </div>
 
-        <form id="registerForm" class="space-y-6">
-            <div class="space-y-2">
+        <form id="detailsForm" class="space-y-5">
+            <div class="space-y-1.5">
                 <label for="name" class="block text-sm font-medium text-slate-300">Full Name</label>
-                <input type="text" id="name" required class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-white placeholder-slate-500 shadow-inner" placeholder="Full Name">
+                <input type="text" id="name" required autocomplete="name"
+                    class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-white placeholder-slate-500"
+                    placeholder="Your full name">
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-1.5">
                 <label for="rollNumber" class="block text-sm font-medium text-slate-300">Roll Number</label>
-                <input type="text" id="rollNumber" required class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-white placeholder-slate-500 shadow-inner" placeholder="00">
+                <input type="number" id="rollNumber" required
+                    class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-white placeholder-slate-500"
+                    placeholder="1 – 60">
             </div>
 
-            <div class="space-y-2">
-                <label for="email" class="block text-sm font-medium text-slate-300">Email Address</label>
-                <input type="email" id="email" required class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-white placeholder-slate-500 shadow-inner" placeholder="25c000.name@college.ac.in">
+            <div class="space-y-1.5">
+                <label for="email" class="block text-sm font-medium text-slate-300">College Email</label>
+                <input type="email" id="email" required autocomplete="email"
+                    class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-white placeholder-slate-500"
+                    placeholder="yourname@gectcr.ac.in">
             </div>
 
-            <div id="errorMsg" class="hidden bg-red-500/10 border border-red-500/50 text-red-400 text-sm p-3 rounded-lg text-center"></div>
+            <div id="detailsError" class="hidden bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-xl text-center"></div>
 
-            <div id="timerContainer" class="hidden" style="display:none">
-                <div class="flex flex-col items-center justify-center p-4 bg-dark-800/80 border border-primary-500/30 rounded-lg">
-                    <p class="text-sm text-slate-400 mb-1" id="timerLabel">Test Starts In</p>
-                    <p class="text-2xl font-mono font-bold text-primary-400 tracking-wider" id="timerDisplay">--:--:--</p>
+            <button type="submit" id="continueBtn"
+                class="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-accent hover:from-primary-500 hover:to-purple-500 text-white rounded-xl font-semibold shadow-lg transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                <span>View Available Exams</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                </svg>
+            </button>
+        </form>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- PANEL 2 — Exam Dashboard                                   -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="examPanel" class="hidden w-full max-w-2xl relative z-10 animate-fade-in">
+
+        <!-- Header -->
+        <div class="glass-panel rounded-2xl p-5 mb-4 flex items-center justify-between">
+            <div>
+                <p class="text-slate-400 text-xs uppercase tracking-widest mb-0.5">Logged in as</p>
+                <p id="studentGreeting" class="text-white font-semibold text-lg"></p>
+                <p id="studentEmail" class="text-slate-400 text-sm"></p>
+            </div>
+            <button id="switchUserBtn" onclick="switchUser()"
+                class="text-xs text-slate-400 hover:text-white border border-dark-700 hover:border-slate-500 px-3 py-1.5 rounded-lg transition-all">
+                ← Switch
+            </button>
+        </div>
+
+        <!-- Exam list -->
+        <div id="examList" class="space-y-3">
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Empty state -->
+        <div id="examEmpty" class="hidden glass-panel rounded-2xl p-10 text-center">
+            <svg class="w-12 h-12 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            <p class="text-slate-400">No exams available for your college yet.</p>
+            <p class="text-slate-500 text-sm mt-1">Check back later or contact your administrator.</p>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MODAL — Register & Start Exam                              -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="startModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="glass-panel rounded-2xl p-6 w-full max-w-sm animate-fade-in">
+            <h3 class="text-lg font-bold text-white mb-1" id="modalExamTitle">Start Exam</h3>
+            <p class="text-slate-400 text-sm mb-5">Confirm your details and begin the test.</p>
+
+            <div class="space-y-3 mb-5 text-sm">
+                <div class="flex justify-between py-2 border-b border-dark-700">
+                    <span class="text-slate-400">Name</span>
+                    <span id="confirmName" class="text-white font-medium"></span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-dark-700">
+                    <span class="text-slate-400">Roll No.</span>
+                    <span id="confirmRoll" class="text-white font-medium"></span>
+                </div>
+                <div class="flex justify-between py-2">
+                    <span class="text-slate-400">Email</span>
+                    <span id="confirmEmail" class="text-white font-medium text-xs break-all"></span>
                 </div>
             </div>
 
-            <button type="submit" id="startBtn" class="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-accent hover:from-primary-500 hover:to-purple-500 text-white rounded-lg font-semibold shadow-lg transform transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-900 focus:ring-primary-500 flex items-center justify-center gap-2">
-                <span id="startBtnText">Start Assessment</span>
-                <svg id="startBtnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-            </button>
-        </form>
+            <div id="modalError" class="hidden bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-xl text-center mb-4"></div>
+
+            <div class="flex gap-3">
+                <button onclick="closeStartModal()"
+                    class="flex-1 py-2.5 border border-dark-700 hover:border-slate-500 text-slate-300 rounded-xl text-sm transition-all">
+                    Cancel
+                </button>
+                <button id="confirmStartBtn" onclick="confirmStart()"
+                    class="flex-1 py-2.5 bg-gradient-to-r from-primary-600 to-accent text-white rounded-xl text-sm font-semibold transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5">
+                    <span>Start Exam</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
     </div>
 
     <script src="js/api.js"></script>

@@ -3,7 +3,8 @@ const { getQuestions, getAnswerKey } = require('../controllers/questionControlle
 
 const router = express.Router();
 
-router.get('/', getQuestions);
+// Both routes require ?examId=xxx query param
+router.get('/',           getQuestions);
 router.get('/answer-key', getAnswerKey);
 
 module.exports = router;

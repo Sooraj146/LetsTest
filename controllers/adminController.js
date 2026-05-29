@@ -1,26 +1,38 @@
 const User = require('../models/User');
 const Question = require('../models/Question');
-const Settings = require('../models/Settings');
 
-// @desc  Get leaderboard (all submitted users sorted by score)
-// @route GET /api/admin/leaderboard
+// Helper — require examId query param
+function requireExamId(req, res) {
+  const examId = req.query.examId || req.body.examId;
+  if (!examId) {
+    res.status(400).json({ message: 'examId is required' });
+    return null;
+  }
+  return examId;
+}
+
+// @desc  Get leaderboard for a specific exam
+// @route GET /api/admin/leaderboard?examId=xxx
 exports.getLeaderboard = async (req, res) => {
   try {
-    const users = await User.find({ isSubmitted: true })
+    const examId = requireExamId(req, res);
+    if (!examId) return;
+
+    const users = await User.find({ isSubmitted: true, examId })
       .select('name rollNumber email totalScore sectionScores createdAt')
       .sort({ totalScore: -1 });
 
     const leaderboard = users.map((u, i) => ({
-      rank: i + 1,
-      name: u.name,
-      rollNumber: u.rollNumber,
-      email: u.email,
-      totalScore: u.totalScore,
+      rank:          i + 1,
+      name:          u.name,
+      rollNumber:    u.rollNumber,
+      email:         u.email,
+      totalScore:    u.totalScore,
       sectionScores: Object.fromEntries(u.sectionScores),
-      submittedAt: u.createdAt,
+      submittedAt:   u.createdAt,
     }));
 
-    const totalQuestions = await Question.countDocuments({});
+    const totalQuestions = await Question.countDocuments({ examId });
 
     res.status(200).json({ leaderboard, totalQuestions });
   } catch (error) {
@@ -28,32 +40,33 @@ exports.getLeaderboard = async (req, res) => {
   }
 };
 
-// @desc  Get per-question analytics
-// @route GET /api/admin/analytics
+// @desc  Get per-question analytics for a specific exam
+// @route GET /api/admin/analytics?examId=xxx
 exports.getQuestionAnalytics = async (req, res) => {
   try {
-    const questions = await Question.find({});
-    const submittedUsers = await User.find({ isSubmitted: true });
-    const totalStudents = submittedUsers.length;
+    const examId = requireExamId(req, res);
+    if (!examId) return;
 
-    const analytics = questions.map((q) => {
-      let correctCount = 0;
+    const questions      = await Question.find({ examId });
+    const submittedUsers = await User.find({ isSubmitted: true, examId });
+    const totalStudents  = submittedUsers.length;
+
+    const analytics = questions.map(q => {
+      let correctCount   = 0;
       let attemptedCount = 0;
-
-      submittedUsers.forEach((user) => {
-        const userAnswer = user.answers.get(q._id.toString());
-        if (userAnswer) {
+      submittedUsers.forEach(user => {
+        const ans = user.answers.get(q._id.toString());
+        if (ans) {
           attemptedCount++;
-          if (userAnswer === q.correctAnswer) correctCount++;
+          if (ans === q.correctAnswer) correctCount++;
         }
       });
-
       return {
-        _id: q._id,
-        section: q.section,
-        questionText: q.questionText,
+        _id:              q._id,
+        section:          q.section,
+        questionText:     q.questionText,
         correctCount,
-        wrongCount: attemptedCount - correctCount,
+        wrongCount:       attemptedCount - correctCount,
         unattemptedCount: totalStudents - attemptedCount,
         totalStudents,
       };
@@ -65,29 +78,31 @@ exports.getQuestionAnalytics = async (req, res) => {
   }
 };
 
-// @desc  Get all questions WITH correct answers (admin only)
-// @route GET /api/admin/questions
+// @desc  Get all questions WITH correct answers (admin only) for a specific exam
+// @route GET /api/admin/questions?examId=xxx
 exports.getAdminQuestions = async (req, res) => {
   try {
-    const questions = await Question.find({});
+    const examId = requireExamId(req, res);
+    if (!examId) return;
+    const questions = await Question.find({ examId });
     res.status(200).json(questions);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc  Add a new question
+// @desc  Add a question to a specific exam
 // @route POST /api/admin/questions
 exports.addQuestion = async (req, res) => {
   try {
-    const { section, questionText, options, correctAnswer } = req.body;
-    if (!section || !questionText || !options || !correctAnswer) {
-      return res.status(400).json({ message: 'All fields are required' });
+    const { examId, section, questionText, options, correctAnswer } = req.body;
+    if (!examId || !section || !questionText || !options || !correctAnswer) {
+      return res.status(400).json({ message: 'All fields are required including examId' });
     }
     if (options.length !== 4) {
       return res.status(400).json({ message: 'Exactly 4 options required' });
     }
-    const question = await Question.create({ section, questionText, options, correctAnswer });
+    const question = await Question.create({ examId, section, questionText, options, correctAnswer });
     res.status(201).json(question);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -123,106 +138,65 @@ exports.deleteQuestion = async (req, res) => {
   }
 };
 
-// @desc  Delete ALL user records (reset for next test)
-// @route DELETE /api/admin/users
+// @desc  Clear all users for a specific exam
+// @route DELETE /api/admin/users?examId=xxx
 exports.clearAllUsers = async (req, res) => {
   try {
-    const result = await User.deleteMany({});
-    res.status(200).json({ message: `${result.deletedCount} user(s) cleared successfully.` });
+    const examId = requireExamId(req, res);
+    if (!examId) return;
+    const result = await User.deleteMany({ examId });
+    res.status(200).json({ message: `${result.deletedCount} user(s) cleared for this exam.` });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc  Delete ALL questions
-// @route DELETE /api/admin/questions
+// @desc  Clear all questions for a specific exam
+// @route DELETE /api/admin/questions?examId=xxx
 exports.clearAllQuestions = async (req, res) => {
   try {
-    const result = await Question.deleteMany({});
-    res.status(200).json({ message: `${result.deletedCount} question(s) cleared successfully.` });
+    const examId = requireExamId(req, res);
+    if (!examId) return;
+    const result = await Question.deleteMany({ examId });
+    res.status(200).json({ message: `${result.deletedCount} question(s) cleared.` });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc  Bulk add questions
+// @desc  Bulk add questions to a specific exam
 // @route POST /api/admin/questions/bulk
 exports.bulkAddQuestions = async (req, res) => {
   try {
-    const questions = req.body; // Array of { section, questionText, options, correctAnswer }
+    const { examId, questions } = req.body;
+    if (!examId) return res.status(400).json({ message: 'examId is required' });
     if (!Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ message: 'Invalid questions data' });
     }
 
-    // 1. Bulk Insert
-    await Question.insertMany(questions);
+    // Attach examId to every question
+    const withExamId = questions.map(q => ({ ...q, examId }));
+    await Question.insertMany(withExamId);
 
-    // 2. Remove duplicates based on trimmed questionText
-    // We'll use aggregation to find duplicates
+    // Remove duplicates based on trimmed questionText within this exam
     const duplicates = await Question.aggregate([
-      {
-        $project: {
-          trimmedText: { $trim: { input: "$questionText" } },
-          original: "$$ROOT"
-        }
-      },
-      {
-        $group: {
-          _id: "$trimmedText",
-          ids: { $push: "$original._id" },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $match: {
-          count: { $gt: 1 }
-        }
-      }
+      { $match: { examId: require('mongoose').Types.ObjectId.createFromHexString(examId) } },
+      { $project: { trimmedText: { $trim: { input: '$questionText' } }, original: '$$ROOT' } },
+      { $group: { _id: '$trimmedText', ids: { $push: '$original._id' }, count: { $sum: 1 } } },
+      { $match: { count: { $gt: 1 } } },
     ]);
 
     let deletedCount = 0;
     for (const group of duplicates) {
-      // Keep the first ID, delete the rest
       const idsToDelete = group.ids.slice(1);
-      const result = await Question.deleteMany({ _id: { $in: idsToDelete } });
-      deletedCount += result.deletedCount;
+      const r = await Question.deleteMany({ _id: { $in: idsToDelete } });
+      deletedCount += r.deletedCount;
     }
 
     res.status(201).json({
-      message: `Bulk insertion complete. ${questions.length} questions processed. ${deletedCount} duplicates removed.`,
-      insertedCount: questions.length - deletedCount
+      message: `${questions.length} questions processed. ${deletedCount} duplicates removed.`,
+      insertedCount: questions.length - deletedCount,
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc  Get test timer settings
-// @route GET /api/admin/settings
-exports.getSettings = async (req, res) => {
-  try {
-    let settings = await Settings.findOne();
-    if (!settings) {
-      settings = await Settings.create({});
-    }
-    res.status(200).json(settings);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc  Update test timer settings
-// @route PUT /api/admin/settings
-exports.updateSettings = async (req, res) => {
-  try {
-    let settings = await Settings.findOne();
-    if (!settings) settings = new Settings();
-    
-    settings.startTime = req.body.startTime || null;
-    settings.endTime = req.body.endTime || null;
-    
-    await settings.save();
-    res.status(200).json(settings);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -21,7 +21,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sessionUserStr = sessionStorage.getItem('user');
     if (!sessionUserStr) { window.location.href = '/'; return; }
     const user = JSON.parse(sessionUserStr);
-    if (user.isSubmitted) { window.location.href = '/result.html'; return; }
+    if (!user.examId) { window.location.href = '/'; return; }  // must have an exam
+    if (user.isSubmitted) { window.location.href = `/result.html?examId=${user.examId}`; return; }
 
     document.getElementById('studentName').textContent = user.name;
 
@@ -78,7 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Fetch Questions ---
     try {
         loader.classList.remove('hidden');
-        const raw = await api.getQuestions();
+        const raw = await api.getQuestions(user.examId);
 
         // Group by section preserving insertion order
         const grouped = {};
@@ -112,7 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Timer Logic ---
     try {
-        const settings = await api.getSettings();
+        const settings = await api.getExam(user.examId);
         if (settings.endTime) {
             const endD = new Date(settings.endTime);
             const timerContainer = document.getElementById('testTimerContainer');
@@ -400,11 +401,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.disabled = true;
         btn.textContent = 'Submitting...';
         try {
-            await api.submitTest({ rollNumber: user.rollNumber, answers });
+            await api.submitTest({ rollNumber: user.rollNumber, examId: user.examId, answers });
             user.isSubmitted = true;
             sessionStorage.setItem('user', JSON.stringify(user));
             localStorage.removeItem(savedAnswersKey);
-            window.location.href = '/result.html';
+            window.location.href = `/result.html?examId=${user.examId}`;
         } catch (err) {
             alert(err.message || 'Submission failed');
             btn.disabled = false;

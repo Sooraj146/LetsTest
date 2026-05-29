@@ -12,7 +12,9 @@ let activeQSection = 'All';
 let editingQuestionId = null;
 let deletingQuestionId = null;
 let selectedCorrectAnswer = null;
-let totalQuestionsGlobal = 0; // updated from API — never hardcoded
+let totalQuestionsGlobal = 0;
+let selectedExamId = null;   // currently selected exam
+let allExams = [];            // cached exam list
 
 // ----------------------------------------------------------------
 // HELPERS
@@ -60,7 +62,7 @@ async function adminLogin() {
     dash.classList.remove('hidden');
     dash.classList.add('flex');
 
-    await loadLeaderboard();
+    await loadExamSelector();
 }
 
 // Try to restore session on load
@@ -72,7 +74,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const dash = document.getElementById('dashboard');
         dash.classList.remove('hidden');
         dash.classList.add('flex');
-        loadLeaderboard();
+        loadExamSelector();
     }
 
     document.getElementById('adminPasswordInput').addEventListener('keydown', (e) => {
@@ -109,20 +111,21 @@ function switchTab(tab) {
     document.querySelector(`[data-tab="${tab}"]`).classList.add('active-tab');
     document.getElementById(`tab-${tab}`).classList.remove('hidden');
 
+    // Reset loaded flags when switching exams
     if (tab === 'analytics' && !analyticsLoaded) { loadAnalytics(); analyticsLoaded = true; }
-    if (tab === 'questions' && !questionsLoaded) { loadAdminQuestions(); questionsLoaded = true; }
-    if (tab === 'settings') { loadSettings(); }
+    if (tab === 'questions' && !questionsLoaded)  { loadAdminQuestions(); questionsLoaded = true; }
+    if (tab === 'settings') { renderExamSettingsTab(); }
 }
 
 // ----------------------------------------------------------------
 // LEADERBOARD
 // ----------------------------------------------------------------
 async function loadLeaderboard() {
-    const res = await adminFetch('/api/admin/leaderboard');
+    if (!selectedExamId) return;
+    const res = await adminFetch(`/api/admin/leaderboard?examId=${selectedExamId}`);
     if (res.status === 401) { adminLogout(); return; }
     const payload = await res.json();
-    // API now returns { leaderboard: [...], totalQuestions: N }
-    allLeaderboard = payload.leaderboard ?? payload; // backward-compat if old format
+    allLeaderboard = payload.leaderboard ?? payload;
     totalQuestionsGlobal = payload.totalQuestions ?? 0;
     renderLeaderboard(allLeaderboard);
 }
@@ -202,7 +205,8 @@ function filterTable(query) {
 // ANALYTICS
 // ----------------------------------------------------------------
 async function loadAnalytics() {
-    const res = await adminFetch('/api/admin/analytics');
+    if (!selectedExamId) return;
+    const res = await adminFetch(`/api/admin/analytics?examId=${selectedExamId}`);
     allAnalytics = await res.json();
 
     // Build section filter pills
@@ -295,7 +299,8 @@ function renderAnalyticsTable(section) {
 // QUESTION MANAGEMENT
 // ----------------------------------------------------------------
 async function loadAdminQuestions() {
-    const res = await adminFetch('/api/admin/questions');
+    if (!selectedExamId) return;
+    const res = await adminFetch(`/api/admin/questions?examId=${selectedExamId}`);
     allAdminQuestions = await res.json();
     renderSectionFilter();
     renderQuestions('All');
@@ -481,7 +486,7 @@ async function saveQuestion() {
     const btn = document.getElementById('modalSaveBtn');
     btn.disabled = true; btn.textContent = 'Saving...';
 
-    const body = JSON.stringify({ section, questionText, options, correctAnswer });
+    const body = JSON.stringify({ examId: selectedExamId, section, questionText, options, correctAnswer });
     const url  = editingQuestionId ? `/api/admin/questions/${editingQuestionId}` : '/api/admin/questions';
     const method = editingQuestionId ? 'PUT' : 'POST';
 
@@ -778,7 +783,7 @@ async function confirmClearUsers() {
     btn.disabled = true;
     btn.textContent = 'Clearing...';
 
-    const res = await adminFetch('/api/admin/users', { method: 'DELETE' });
+    const res = await adminFetch(`/api/admin/users?examId=${selectedExamId}`, { method: 'DELETE' });
 
     if (res.ok) {
         closeClearUsersModal();
@@ -798,68 +803,224 @@ async function confirmClearUsers() {
 }
 
 // ----------------------------------------------------------------
-// TIMER SETTINGS
+// EXAM SELECTOR  (replaces the old Settings/Timer panel)
 // ----------------------------------------------------------------
-async function loadSettings() {
-    const res = await adminFetch('/api/admin/settings');
-    if (!res.ok) return;
-    const settings = await res.json();
-    
-    // Format dates for datetime-local input
-    if (settings.startTime) {
-        const d = new Date(settings.startTime);
-        document.getElementById('timerStart').value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+async function loadExamSelector() {
+    const res = await adminFetch('/api/exams');
+    allExams = res.ok ? await res.json() : [];
+
+    renderExamSelectorBar();
+
+    // Select the first exam by default (or last-used from sessionStorage)
+    const saved = sessionStorage.getItem('selectedExamId');
+    const initial = saved && allExams.find(e => e._id === saved)
+        ? saved
+        : allExams[0]?._id;
+
+    if (initial) {
+        selectExam(initial);
     } else {
-        document.getElementById('timerStart').value = '';
-    }
-    
-    if (settings.endTime) {
-        const d = new Date(settings.endTime);
-        document.getElementById('timerEnd').value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    } else {
-        document.getElementById('timerEnd').value = '';
+        // No exams yet — prompt admin to create one
+        document.getElementById('noExamBanner').classList.remove('hidden');
     }
 }
 
-async function saveTimerSettings() {
-    const startVal = document.getElementById('timerStart').value;
-    const endVal = document.getElementById('timerEnd').value;
-    const errEl = document.getElementById('timerError');
-    const succEl = document.getElementById('timerSuccess');
-    
+function renderExamSelectorBar() {
+    const select = document.getElementById('examSelectorDropdown');
+    if (!select) return;
+    select.innerHTML = allExams.length
+        ? allExams.map(e =>
+            `<option value="${e._id}" ${e._id === selectedExamId ? 'selected' : ''}>${e.title}</option>`
+          ).join('')
+        : '<option value="">No exams yet — create one</option>';
+}
+
+function selectExam(examId) {
+    selectedExamId = examId;
+    sessionStorage.setItem('selectedExamId', examId);
+
+    // Reset loaded flags so tabs re-fetch for the new exam
+    analyticsLoaded = false;
+    questionsLoaded = false;
+    allLeaderboard  = [];
+    allAnalytics    = [];
+    allAdminQuestions = [];
+
+    document.getElementById('noExamBanner').classList.add('hidden');
+
+    // Show exam name in header bar
+    const exam = allExams.find(e => e._id === examId);
+    if (exam) {
+        document.getElementById('activeExamLabel').textContent = exam.title;
+    }
+
+    // Update dropdown selection
+    const select = document.getElementById('examSelectorDropdown');
+    if (select) select.value = examId;
+
+    // Reload current active tab data
+    loadLeaderboard();
+    analyticsLoaded = false;
+    questionsLoaded = false;
+}
+
+// Called when the dropdown changes
+function onExamSelectorChange(select) {
+    if (select.value) selectExam(select.value);
+}
+
+// ── Exam Settings tab ────────────────────────────────────────────
+function renderExamSettingsTab() {
+    const exam = allExams.find(e => e._id === selectedExamId);
+    if (!exam) return;
+
+    const toLocal = (iso) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    };
+
+    document.getElementById('timerStart').value = toLocal(exam.startTime);
+    document.getElementById('timerEnd').value   = toLocal(exam.endTime);
+    document.getElementById('examTitleInput').value = exam.title;
+
+    // Checkboxes
+    document.getElementById('chkGEC').checked = exam.targetColleges.includes('@gectcr.ac.in');
+    document.getElementById('chkRIT').checked = exam.targetColleges.includes('@rit.ac.in');
+}
+
+async function saveExamSettings() {
+    const title      = document.getElementById('examTitleInput').value.trim();
+    const startVal   = document.getElementById('timerStart').value;
+    const endVal     = document.getElementById('timerEnd').value;
+    const errEl      = document.getElementById('timerError');
+    const succEl     = document.getElementById('timerSuccess');
+
     errEl.classList.add('hidden');
     succEl.classList.add('hidden');
-    
-    let startTime = null;
-    let endTime = null;
-    
-    if (startVal) startTime = new Date(startVal).toISOString();
-    if (endVal) endTime = new Date(endVal).toISOString();
-    
+
+    const colleges = [];
+    if (document.getElementById('chkGEC').checked) colleges.push('@gectcr.ac.in');
+    if (document.getElementById('chkRIT').checked) colleges.push('@rit.ac.in');
+
+    if (!title) {
+        errEl.textContent = 'Exam title is required.';
+        errEl.classList.remove('hidden'); return;
+    }
+    if (colleges.length === 0) {
+        errEl.textContent = 'At least one college must be selected.';
+        errEl.classList.remove('hidden'); return;
+    }
+
+    let startTime = startVal ? new Date(startVal).toISOString() : null;
+    let endTime   = endVal   ? new Date(endVal).toISOString()   : null;
+
     if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
         errEl.textContent = 'End time must be after start time.';
-        errEl.classList.remove('hidden');
-        return;
+        errEl.classList.remove('hidden'); return;
     }
-    
+
     const btn = document.getElementById('saveTimerBtn');
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
-    
-    const res = await adminFetch('/api/admin/settings', {
+    btn.disabled = true; btn.textContent = 'Saving...';
+
+    const res = await adminFetch(`/api/admin/exams/${selectedExamId}`, {
         method: 'PUT',
-        body: JSON.stringify({ startTime, endTime })
+        body: JSON.stringify({ title, targetColleges: colleges, startTime, endTime }),
     });
-    
-    btn.disabled = false;
-    btn.textContent = 'Save Timer Settings';
-    
+
+    btn.disabled = false; btn.textContent = 'Save Exam Settings';
+
     if (res.ok) {
+        const updated = await res.json();
+        // Update local cache
+        const idx = allExams.findIndex(e => e._id === selectedExamId);
+        if (idx !== -1) allExams[idx] = updated;
+        renderExamSelectorBar();
+        document.getElementById('activeExamLabel').textContent = updated.title;
         succEl.classList.remove('hidden');
         setTimeout(() => succEl.classList.add('hidden'), 3000);
     } else {
-        errEl.textContent = 'Failed to save settings.';
+        errEl.textContent = 'Failed to save exam settings.';
         errEl.classList.remove('hidden');
+    }
+}
+
+// ── Create new exam modal ─────────────────────────────────────────
+function openCreateExamModal() {
+    document.getElementById('newExamTitle').value = '';
+    document.getElementById('newChkGEC').checked  = true;
+    document.getElementById('newChkRIT').checked  = false;
+    document.getElementById('newExamStart').value = '';
+    document.getElementById('newExamEnd').value   = '';
+    document.getElementById('createExamError').classList.add('hidden');
+    document.getElementById('createExamModal').classList.remove('hidden');
+    document.getElementById('createExamModal').classList.add('flex');
+}
+
+function closeCreateExamModal() {
+    document.getElementById('createExamModal').classList.add('hidden');
+    document.getElementById('createExamModal').classList.remove('flex');
+}
+
+async function confirmCreateExam() {
+    const title    = document.getElementById('newExamTitle').value.trim();
+    const startVal = document.getElementById('newExamStart').value;
+    const endVal   = document.getElementById('newExamEnd').value;
+    const errEl    = document.getElementById('createExamError');
+    errEl.classList.add('hidden');
+
+    const colleges = [];
+    if (document.getElementById('newChkGEC').checked) colleges.push('@gectcr.ac.in');
+    if (document.getElementById('newChkRIT').checked) colleges.push('@rit.ac.in');
+
+    if (!title) { errEl.textContent = 'Title is required.'; errEl.classList.remove('hidden'); return; }
+    if (!colleges.length) { errEl.textContent = 'Select at least one college.'; errEl.classList.remove('hidden'); return; }
+
+    const btn = document.getElementById('createExamBtn');
+    btn.disabled = true; btn.textContent = 'Creating...';
+
+    const res = await adminFetch('/api/admin/exams', {
+        method: 'POST',
+        body: JSON.stringify({
+            title,
+            targetColleges: colleges,
+            startTime: startVal ? new Date(startVal).toISOString() : null,
+            endTime:   endVal   ? new Date(endVal).toISOString()   : null,
+        }),
+    });
+
+    btn.disabled = false; btn.textContent = 'Create';
+
+    if (res.ok) {
+        const exam = await res.json();
+        allExams.unshift(exam);
+        renderExamSelectorBar();
+        closeCreateExamModal();
+        selectExam(exam._id);
+        // Switch to settings tab so admin can see the new exam
+        switchTab('settings');
+    } else {
+        const data = await res.json();
+        errEl.textContent = data.message || 'Failed to create exam.';
+        errEl.classList.remove('hidden');
+    }
+}
+
+// ── Delete exam ───────────────────────────────────────────────────
+async function deleteCurrentExam() {
+    if (!selectedExamId) return;
+    const exam = allExams.find(e => e._id === selectedExamId);
+    if (!confirm(`Delete exam "${exam?.title}"? This will NOT delete associated questions or student records.`)) return;
+
+    const res = await adminFetch(`/api/admin/exams/${selectedExamId}`, { method: 'DELETE' });
+    if (res.ok) {
+        allExams = allExams.filter(e => e._id !== selectedExamId);
+        selectedExamId = null;
+        sessionStorage.removeItem('selectedExamId');
+        renderExamSelectorBar();
+        await loadExamSelector();
+    } else {
+        alert('Failed to delete exam.');
     }
 }
 
@@ -897,7 +1058,7 @@ function handleBulkCsv(input) {
 
         const res = await adminFetch('/api/admin/questions/bulk', {
             method: 'POST',
-            body: JSON.stringify(questions)
+            body: JSON.stringify({ examId: selectedExamId, questions })
         });
         const data = await res.json();
         if (res.ok) {
@@ -907,7 +1068,7 @@ function handleBulkCsv(input) {
         } else {
             showResult('Upload Failed', data.message, 'error');
         }
-        input.value = ''; // reset input
+        input.value = '';
     };
     reader.readAsText(file);
 }
@@ -987,7 +1148,7 @@ async function confirmClearQuestions() {
     btn.disabled = true;
     btn.textContent = 'Deleting...';
 
-    const res = await adminFetch('/api/admin/questions', { method: 'DELETE' });
+    const res = await adminFetch(`/api/admin/questions?examId=${selectedExamId}`, { method: 'DELETE' });
     if (res.ok) {
         closeClearQuestionsModal();
         allAdminQuestions = [];

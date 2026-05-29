@@ -2,11 +2,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sessionUserStr = sessionStorage.getItem('user');
     if (!sessionUserStr) { window.location.href = '/'; return; }
 
-    const user = JSON.parse(sessionUserStr);
+    const user    = JSON.parse(sessionUserStr);
+    // examId comes from URL (?examId=xxx) — allows direct linking from exam dashboard
+    const examId  = new URLSearchParams(window.location.search).get('examId') || user.examId;
+    if (!examId) { window.location.href = '/'; return; }
+
     document.getElementById('studentGreeting').textContent = `Great job, ${user.name}! Here are your results.`;
 
     try {
-        const result = await api.getResult(user.rollNumber);
+        const result = await api.getResult(examId, user.rollNumber);
 
         // --- Populate counts ---
         document.getElementById('centerScore').textContent = result.totalScore;
@@ -102,7 +106,7 @@ async function downloadAnswerKey() {
     btn.innerHTML = `<svg class="animate-spin w-5 h-5 text-primary-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Generating...`;
 
     try {
-        const resp = await fetch('/api/questions/answer-key');
+        const resp = await fetch(`/api/questions/answer-key?examId=${examId}`);
         if (!resp.ok) throw new Error('Failed to fetch answer key');
         const data = await resp.json();   // { sections: [...], questions: { section: [...] } }
 

@@ -1,126 +1,309 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    // Check if user is already logged in and not submitted
-    const sessionUser = sessionStorage.getItem('user');
-    if (sessionUser) {
-        const user = JSON.parse(sessionUser);
-        if (user.isSubmitted) {
-            window.location.href = '/result.html';
-        } else {
-            window.location.href = '/test.html';
-        }
+/**
+ * register.js — Exam dashboard logic
+ *
+ * Flow:
+ *  1. Student fills details form → clicks "View Available Exams"
+ *  2. Validate fields client-side
+ *  3. Fetch /api/exams → filter by email domain → fetch /api/users/my-exams
+ *  4. Render exam cards: Active / Upcoming / Completed / Not Available
+ *  5. "Take Exam" → open confirm modal → POST /api/users/register → redirect to test.html
+ *  6. "View Result" → redirect to result.html?examId=xxx
+ */
+
+// ── State ────────────────────────────────────────────────────────────
+let studentInfo    = null;  // { name, rollNumber, email }
+let pendingExamId  = null;  // examId waiting for confirm-start
+let timers         = {};    // examId -> intervalId (for countdown cleanup)
+
+// ── Elements ─────────────────────────────────────────────────────────
+const detailsPanel = document.getElementById('detailsPanel');
+const examPanel    = document.getElementById('examPanel');
+const detailsForm  = document.getElementById('detailsForm');
+const detailsError = document.getElementById('detailsError');
+const continueBtn  = document.getElementById('continueBtn');
+
+// ── On load: restore session if present ──────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const saved = sessionStorage.getItem('studentInfo');
+    if (saved) {
+        studentInfo = JSON.parse(saved);
+        // Pre-fill form
+        document.getElementById('name').value       = studentInfo.name;
+        document.getElementById('rollNumber').value = studentInfo.rollNumber;
+        document.getElementById('email').value      = studentInfo.email;
+        showExamDashboard();
+    }
+});
+
+// ── Details form submit ───────────────────────────────────────────────
+detailsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError(detailsError);
+
+    const name       = document.getElementById('name').value.trim();
+    const rollNumber = document.getElementById('rollNumber').value.trim();
+    const email      = document.getElementById('email').value.trim();
+
+    // Client-side validation
+    const roll = Number(rollNumber);
+    if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
+        return showError(detailsError, 'Roll number must be between 1–60');
     }
 
-    const form = document.getElementById('registerForm');
-    const errorMsg = document.getElementById('errorMsg');
-    const submitBtn = document.getElementById('startBtn');
-    const timerContainer = document.getElementById('timerContainer');
-    const timerDisplay = document.getElementById('timerDisplay');
-    const timerLabel = document.getElementById('timerLabel');
+    const emailLower   = email.toLowerCase();
+    const validDomains = ['@gectcr.ac.in', '@rit.ac.in'];
+    if (!validDomains.some(d => emailLower.endsWith(d))) {
+        return showError(detailsError, 'Email must end with @gectcr.ac.in or @rit.ac.in');
+    }
 
-    let canStart = true;
-    let timerInterval = null;
+    // Loading state
+    continueBtn.disabled = true;
+    continueBtn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Loading...`;
+
+    studentInfo = { name, rollNumber, email: emailLower };
+    sessionStorage.setItem('studentInfo', JSON.stringify(studentInfo));
+
+    continueBtn.disabled = false;
+    continueBtn.innerHTML = `<span>View Available Exams</span><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`;
+
+    showExamDashboard();
+});
+
+// ── Show exam dashboard ───────────────────────────────────────────────
+async function showExamDashboard() {
+    // Update header
+    document.getElementById('studentGreeting').textContent = studentInfo.name;
+    document.getElementById('studentEmail').textContent    = studentInfo.email;
+
+    // Transition panels
+    detailsPanel.classList.add('hidden');
+    examPanel.classList.remove('hidden');
+
+    // Clear old timers
+    Object.values(timers).forEach(clearInterval);
+    timers = {};
+
+    // Render loading skeletons
+    const list = document.getElementById('examList');
+    list.innerHTML = `
+        ${[1,2].map(() => `
+        <div class="glass-panel rounded-2xl p-5 animate-pulse">
+            <div class="h-4 bg-dark-700 rounded w-1/3 mb-3"></div>
+            <div class="h-6 bg-dark-700 rounded w-2/3 mb-2"></div>
+            <div class="h-3 bg-dark-700 rounded w-1/2"></div>
+        </div>`).join('')}`;
 
     try {
-        const settings = await api.getSettings();
-        const now = new Date();
+        const [allExams, myExams] = await Promise.all([
+            api.getExams(),
+            api.getMyExams({ rollNumber: studentInfo.rollNumber, email: studentInfo.email }),
+        ]);
 
-        if (settings.endTime && new Date(settings.endTime) < now) {
-            canStart = false;
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            timerContainer.style.display = 'block';
-            timerLabel.textContent = 'Status';
-            timerDisplay.textContent = 'Exam Ended';
-            timerDisplay.classList.remove('text-primary-400');
-            timerDisplay.classList.add('text-red-400');
-        } else if (settings.startTime && new Date(settings.startTime) > now) {
-            canStart = false;
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            timerContainer.style.display = 'block';
+        // Filter exams by student's college domain
+        const emailDomain = '@' + studentInfo.email.split('@')[1];
+        const myExamsList = allExams.filter(e => e.targetColleges.includes(emailDomain));
 
-            const startD = new Date(settings.startTime);
-
-            const updateTimer = () => {
-                const diff = startD - new Date();
-                if (diff <= 0) {
-                    clearInterval(timerInterval);
-                    canStart = true;
-                    submitBtn.disabled = false;
-                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    timerContainer.style.display = 'none';
-                    return;
-                }
-
-                const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
-                const m = Math.floor((diff / 1000 / 60) % 60);
-                const s = Math.floor((diff / 1000) % 60);
-
-                timerDisplay.textContent = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-            };
-
-            updateTimer();
-            timerInterval = setInterval(updateTimer, 1000);
+        if (myExamsList.length === 0) {
+            list.innerHTML = '';
+            document.getElementById('examEmpty').classList.remove('hidden');
+            return;
         }
-    } catch (e) {
-        console.error('Failed to load settings', e);
+
+        document.getElementById('examEmpty').classList.add('hidden');
+
+        // Categorise
+        const now       = new Date();
+        const active    = [];
+        const upcoming  = [];
+        const past      = [];
+
+        myExamsList.forEach(exam => {
+            const start  = exam.startTime ? new Date(exam.startTime) : null;
+            const end    = exam.endTime   ? new Date(exam.endTime)   : null;
+            const done   = myExams[exam._id]?.isSubmitted || false;
+
+            if (end && end < now) {
+                past.push({ exam, done, submission: myExams[exam._id] });
+            } else if (start && start > now) {
+                upcoming.push({ exam, done });
+            } else {
+                active.push({ exam, done, submission: myExams[exam._id] });
+            }
+        });
+
+        // Sort: active first, then upcoming, then past
+        list.innerHTML = '';
+
+        const renderSection = (label, color, items) => {
+            if (!items.length) return;
+            const heading = document.createElement('p');
+            heading.className = `text-xs uppercase tracking-widest font-semibold text-${color}-400 mt-2 mb-1 px-1`;
+            heading.textContent = label;
+            list.appendChild(heading);
+            items.forEach(item => list.appendChild(buildExamCard(item)));
+        };
+
+        renderSection('Active Now',   'emerald', active);
+        renderSection('Upcoming',     'yellow',  upcoming);
+        renderSection('Past Exams',   'slate',   past);
+
+    } catch (err) {
+        list.innerHTML = `<div class="glass-panel rounded-2xl p-6 text-center text-red-400">Failed to load exams: ${err.message}</div>`;
+    }
+}
+
+// ── Build exam card ───────────────────────────────────────────────────
+function buildExamCard({ exam, done, submission }) {
+    const now   = new Date();
+    const start = exam.startTime ? new Date(exam.startTime) : null;
+    const end   = exam.endTime   ? new Date(exam.endTime)   : null;
+
+    const isPast     = end && end < now;
+    const isUpcoming = start && start > now && !isPast;
+    const isActive   = !isPast && !isUpcoming;
+
+    const card = document.createElement('div');
+    card.className = 'exam-card glass-panel rounded-2xl p-5';
+
+    // Status badge
+    let badgeHTML = '';
+    if (done) {
+        badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-emerald-400"></span>Completed</span>`;
+    } else if (isActive) {
+        badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-emerald-400 animate-pulse2"></span>Live Now</span>`;
+    } else if (isUpcoming) {
+        badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-yellow-400"></span>Upcoming</span>`;
+    } else {
+        badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-slate-500/10 border border-slate-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-slate-400"></span>Ended</span>`;
     }
 
+    // College tags
+    const collegeTags = exam.targetColleges.map(c =>
+        `<span class="text-xs text-slate-500 bg-dark-700 px-2 py-0.5 rounded-md">${c.replace('@','')}</span>`
+    ).join('');
 
+    // Score if done
+    const scoreHTML = done && submission
+        ? `<span class="text-sm text-slate-400">Your score: <span class="text-white font-semibold">${submission.totalScore}</span></span>`
+        : '';
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!canStart) return;
+    // Action button
+    let actionBtn = '';
+    if (done) {
+        actionBtn = `<a href="result.html?examId=${exam._id}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-xl transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            View Result
+        </a>`;
+    } else if (isActive) {
+        actionBtn = `<button onclick="openStartModal('${exam._id}', '${escHtml(exam.title)}')"
+            class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-primary-600 to-accent hover:from-primary-500 hover:to-purple-500 text-white text-sm font-semibold rounded-xl transition-all hover:-translate-y-0.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            Take Exam
+        </button>`;
+    } else if (isUpcoming) {
+        actionBtn = `<div class="text-sm text-yellow-400 font-mono font-semibold" id="timer-${exam._id}">--:--:--</div>`;
+    }
 
-        const name = document.getElementById('name').value.trim();
-        const rollNumber = document.getElementById('rollNumber').value.trim();
-        const email = document.getElementById('email').value.trim();
+    // Timer caption
+    let timerCaption = '';
+    if (start && !isPast) {
+        const label = isActive ? 'Ends' : 'Starts';
+        const dt    = isActive ? end : start;
+        timerCaption = dt ? `<p class="text-xs text-slate-500 mt-1">${label}: ${dt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>` : '';
+    }
 
-        errorMsg.classList.add('hidden');
+    card.innerHTML = `
+        <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="flex-1 min-w-0">
+                ${badgeHTML}
+                <h2 class="text-base font-semibold text-white mt-2 leading-snug">${escHtml(exam.title)}</h2>
+                <div class="flex flex-wrap gap-1.5 mt-1.5">${collegeTags}</div>
+                ${timerCaption}
+            </div>
+            <div class="flex flex-col items-end gap-2 flex-shrink-0">
+                ${actionBtn}
+                ${scoreHTML}
+            </div>
+        </div>`;
 
-        // --- Roll number validation (1–60 or -1 to -60) ---
-        const roll = Number(rollNumber);
-        if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
-            errorMsg.textContent = 'Roll number must be between 1–60';
-            errorMsg.classList.remove('hidden');
-            return;
+    // Start countdown for upcoming exams
+    if (isUpcoming && start) {
+        const el = card.querySelector(`#timer-${exam._id}`);
+        if (el) {
+            const tick = () => {
+                const diff = start - new Date();
+                if (diff <= 0) { clearInterval(timers[exam._id]); showExamDashboard(); return; }
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                el.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+            };
+            tick();
+            timers[exam._id] = setInterval(tick, 1000);
         }
+    }
 
-        // --- Email domain check ---
-        const emailLower = email.toLowerCase();
-        const validDomains = ['@gectcr.ac.in', '@rit.ac.in'];
-        if (!validDomains.some(d => emailLower.endsWith(d))) {
-            errorMsg.textContent = 'Email must end with @gectcr.ac.in or @rit.ac.in';
-            errorMsg.classList.remove('hidden');
-            return;
-        }
+    return card;
+}
 
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `
-            <svg class="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Processing...`;
+// ── Start exam modal ──────────────────────────────────────────────────
+function openStartModal(examId, examTitle) {
+    pendingExamId = examId;
+    document.getElementById('modalExamTitle').textContent  = examTitle;
+    document.getElementById('confirmName').textContent     = studentInfo.name;
+    document.getElementById('confirmRoll').textContent     = studentInfo.rollNumber;
+    document.getElementById('confirmEmail').textContent    = studentInfo.email;
+    hideError(document.getElementById('modalError'));
+    document.getElementById('startModal').classList.remove('hidden');
+}
 
-        try {
-            const user = await api.register({ name, rollNumber, email });
+function closeStartModal() {
+    document.getElementById('startModal').classList.add('hidden');
+    pendingExamId = null;
+}
 
-            // Store user info
-            sessionStorage.setItem('user', JSON.stringify(user));
+async function confirmStart() {
+    if (!pendingExamId) return;
 
-            if (user.isSubmitted) {
-                window.location.href = '/result.html';
-            } else {
-                window.location.href = '/test.html';
-            }
-        } catch (error) {
-            errorMsg.textContent = error.message;
-            errorMsg.classList.remove('hidden');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `
-                <span>Start Assessment</span>
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
-        }
-    });
-});
+    const btn       = document.getElementById('confirmStartBtn');
+    const modalErr  = document.getElementById('modalError');
+    hideError(modalErr);
+
+    btn.disabled = true;
+    btn.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Starting...`;
+
+    try {
+        const user = await api.register({
+            name:       studentInfo.name,
+            rollNumber: studentInfo.rollNumber,
+            email:      studentInfo.email,
+            examId:     pendingExamId,
+        });
+
+        // Save session with examId
+        sessionStorage.setItem('user', JSON.stringify({ ...user, examId: pendingExamId }));
+        window.location.href = '/test.html';
+
+    } catch (err) {
+        showError(modalErr, err.message);
+        btn.disabled = false;
+        btn.innerHTML = `<span>Start Exam</span><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`;
+    }
+}
+
+// ── Switch user ───────────────────────────────────────────────────────
+function switchUser() {
+    sessionStorage.removeItem('studentInfo');
+    sessionStorage.removeItem('user');
+    studentInfo = null;
+    examPanel.classList.add('hidden');
+    detailsPanel.classList.remove('hidden');
+    Object.values(timers).forEach(clearInterval);
+    timers = {};
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+function showError(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+function hideError(el)      { el.classList.add('hidden'); }
+function pad(n)             { return String(n).padStart(2, '0'); }
+function escHtml(str)       { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

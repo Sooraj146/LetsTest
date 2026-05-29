@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const questionSchema = new mongoose.Schema({
+  // Which exam this question belongs to
+  examId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Exam',
+    required: true,
+    index: true,
+  },
   section: {
     type: String,
     required: true,
@@ -16,7 +23,7 @@ const questionSchema = new mongoose.Schema({
   correctAnswer: {
     type: String,
     required: true,
-  }
+  },
 });
 
 module.exports = mongoose.model('Question', questionSchema);

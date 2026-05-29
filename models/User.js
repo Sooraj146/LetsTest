@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
+  // Which exam this registration is for
+  examId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Exam',
+    required: true,
+    index: true,
+  },
   name: {
     type: String,
     required: true,
@@ -8,31 +15,34 @@ const userSchema = new mongoose.Schema({
   rollNumber: {
     type: String,
     required: true,
-    unique: true,
   },
   email: {
     type: String,
     required: true,
-    unique: true,
   },
   answers: {
     type: Map,
-    of: String, // Question ID -> Answer Option
-    default: {}
+    of: String, // Question ID -> selected option
+    default: {},
   },
   sectionScores: {
     type: Map,
     of: Number,
-    default: {}
+    default: {},
   },
   totalScore: {
     type: Number,
-    default: 0
+    default: 0,
   },
   isSubmitted: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 }, { timestamps: true });
+
+// Compound unique indexes: same student can register once per exam
+// (same roll number or email can appear in DIFFERENT exams)
+userSchema.index({ rollNumber: 1, examId: 1 }, { unique: true });
+userSchema.index({ email: 1,      examId: 1 }, { unique: true });
 
 module.exports = mongoose.model('User', userSchema);

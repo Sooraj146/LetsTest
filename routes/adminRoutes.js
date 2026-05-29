@@ -10,25 +10,34 @@ const {
   clearAllUsers,
   clearAllQuestions,
   bulkAddQuestions,
-  getSettings,
-  updateSettings,
 } = require('../controllers/adminController');
+const {
+  createExam,
+  updateExam,
+  deleteExam,
+} = require('../controllers/examController');
 
 const router = express.Router();
-
-// All routes protected by adminAuth middleware
 router.use(adminAuth);
 
+// ── Exam management ────────────────────────────────────────────────
+router.post('/exams',      createExam);
+router.put('/exams/:id',   updateExam);
+router.delete('/exams/:id', deleteExam);
+
+// ── Leaderboard + analytics (require ?examId=xxx) ──────────────────
 router.get('/leaderboard', getLeaderboard);
-router.get('/analytics', getQuestionAnalytics);
-router.get('/questions', getAdminQuestions);
-router.post('/questions', addQuestion);
-router.post('/questions/bulk', bulkAddQuestions);
-router.put('/questions/:id', updateQuestion);
+router.get('/analytics',   getQuestionAnalytics);
+
+// ── Questions (require ?examId=xxx or examId in body) ──────────────
+router.get('/questions',        getAdminQuestions);
+router.post('/questions',       addQuestion);
+router.post('/questions/bulk',  bulkAddQuestions);
+router.put('/questions/:id',    updateQuestion);
 router.delete('/questions/:id', deleteQuestion);
-router.delete('/questions', clearAllQuestions);
+router.delete('/questions',     clearAllQuestions);
+
+// ── Users ──────────────────────────────────────────────────────────
 router.delete('/users', clearAllUsers);
-router.get('/settings', getSettings);
-router.put('/settings', updateSettings);
 
 module.exports = router;
