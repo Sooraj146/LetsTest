@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - MCA Test</title>
+    <title>Admin Panel — Let's Test</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -12,7 +12,7 @@
                 extend: {
                     colors: {
                         dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155', 600: '#475569' },
-                        primary: { 500: '#3b82f6', 600: '#2563eb' },
+                        primary: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' },
                         accent: '#8b5cf6'
                     },
                     fontFamily: { sans: ['Inter', 'sans-serif'] }
@@ -22,583 +22,237 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- jsPDF + AutoTable for PDF export -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        .glass-panel { background: rgba(30,41,59,0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
+        .sidebar-item { transition: all 0.2s ease; }
+        .sidebar-item.active { background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; color: #60a5fa; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
 </head>
-<body class="bg-dark-900 text-slate-200 font-sans min-h-screen">
+<body class="bg-dark-900 text-slate-200 font-sans min-h-screen relative overflow-x-hidden">
 
-<!-- ======================== LOGIN SCREEN ======================== -->
-<div id="loginScreen" class="min-h-screen flex items-center justify-center relative overflow-hidden">
-    <div class="absolute inset-0 -z-10">
-        <div class="absolute -top-40 -right-40 w-96 h-96 bg-primary-600 rounded-full filter blur-[128px] opacity-20 animate-blob"></div>
-        <div class="absolute top-40 -left-40 w-96 h-96 bg-accent rounded-full filter blur-[128px] opacity-20 animate-blob animation-delay-2000"></div>
+    <!-- Animated background -->
+    <div class="fixed inset-0 overflow-hidden -z-10">
+        <div class="absolute -top-40 -right-40 w-96 h-96 bg-primary-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
+        <div class="absolute -bottom-40 left-20 w-96 h-96 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
     </div>
-    <div class="glass-panel w-full max-w-md p-10 rounded-2xl shadow-2xl">
-        <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-primary-600/20 border border-primary-500/40 mb-4">
-                <svg class="w-7 h-7 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- LOGIN PANEL                                                -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="loginPanel" class="min-h-screen flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md p-8 rounded-2xl shadow-2xl">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-white tracking-tight">Admin <span class="text-primary-400">Login</span></h1>
+                <p class="text-slate-400 text-sm mt-1">Manage exams and students</p>
             </div>
-            <h1 class="text-3xl font-bold text-white">Admin <span class="text-primary-500">Access</span></h1>
-            <p class="text-slate-400 text-sm mt-1">MCA Test — Admin Portal</p>
-        </div>
-        <div class="space-y-4">
-            <input type="text" id="adminUsernameInput" placeholder="Username"
-                   class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 transition-all">
-            <input type="password" id="adminPasswordInput" placeholder="Password"
-                   class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 transition-all">
-            <div id="loginError" class="hidden bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-lg text-center"></div>
-            <button id="loginBtn" onclick="adminLogin()"
-                    class="w-full py-3 bg-gradient-to-r from-primary-600 to-accent hover:from-primary-500 hover:to-purple-500 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
-                Login
-            </button>
+            <form id="loginForm" class="space-y-5">
+                <div class="space-y-1.5">
+                    <label class="block text-sm font-medium text-slate-300">Username</label>
+                    <input type="text" id="username" required class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-white transition-all">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-sm font-medium text-slate-300">Password</label>
+                    <input type="password" id="password" required class="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-white transition-all">
+                </div>
+                <div id="loginError" class="hidden text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-3 rounded-lg text-center"></div>
+                <button type="submit" class="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-xl font-semibold shadow-lg transition-all">Login</button>
+            </form>
         </div>
     </div>
-</div>
 
-<!-- ======================== DASHBOARD ======================== -->
-<div id="dashboard" class="hidden flex-col min-h-screen">
-
-    <!-- Header -->
-    <header class="glass-panel border-b border-dark-700 px-4 md:px-6 py-3 md:py-4 flex justify-between items-center sticky top-0 z-30">
-        <div class="flex items-center gap-2 md:gap-3">
-            <span class="text-xl md:text-2xl font-bold text-white">MCA <span class="text-primary-500">Test</span></span>
-            <span id="adminRoleBadge" class="px-2 py-0.5 text-xs font-semibold bg-accent/20 border border-accent/40 text-purple-300 rounded-full">Admin</span>
-        </div>
-        <div class="flex items-center gap-4">
-            <div id="collegeSelectorContainer" class="hidden items-center gap-2">
-                <span class="text-xs text-slate-500 uppercase font-semibold">College:</span>
-                <select id="globalCollegeSelector" onchange="onGlobalCollegeChange(this)"
-                    class="px-3 py-1.5 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-primary-500 outline-none">
-                </select>
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MAIN ADMIN PANEL                                           -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div id="adminPanel" class="hidden flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 glass-panel border-r border-dark-700 hidden md:flex flex-col">
+            <div class="p-6 border-b border-dark-700">
+                <h2 class="text-xl font-bold text-white">Admin <span class="text-primary-400">Portal</span></h2>
+                <p id="adminRoleLabel" class="text-xs text-slate-500 mt-1 uppercase tracking-widest font-semibold"></p>
             </div>
-            <button onclick="adminLogout()" class="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm border border-dark-700 rounded-lg hover:bg-dark-800 text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 md:gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                <span class="hidden sm:inline">Logout</span>
-            </button>
-        </div>
-    </header>
-
-    <!-- Exam Selector Bar -->
-    <div class="bg-dark-800/60 border-b border-dark-700 px-4 md:px-6 py-2.5 flex items-center gap-3">
-        <span class="text-xs text-slate-500 uppercase tracking-widest font-semibold flex-shrink-0">Exam:</span>
-        <select id="examSelectorDropdown" onchange="onExamSelectorChange(this)"
-            class="flex-1 max-w-xs px-3 py-1.5 bg-dark-900 border border-dark-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-primary-500 outline-none">
-            <option>Loading exams...</option>
-        </select>
-        <span id="activeExamLabel" class="text-xs text-slate-500 italic hidden md:block"></span>
-        <button onclick="openCreateExamModal()"
-            class="ml-auto flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-xs font-semibold rounded-lg transition-colors">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            New Exam
-        </button>
-    </div>
-
-    <!-- Tab Navigation -->
-    <div class="border-b border-dark-700 bg-dark-900/80 sticky top-[53px] md:top-[65px] z-20">
-        <div class="flex px-4 md:px-6 gap-0 overflow-x-auto custom-scrollbar" style="-webkit-overflow-scrolling: touch; scrollbar-width: none;">
-            <!-- Main Admin Specific Tabs -->
-            <button id="tabBtnColleges" class="tab-btn hidden" data-tab="colleges" onclick="switchTab('colleges')">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                Colleges
-            </button>
-            <button id="tabBtnAdmins" class="tab-btn hidden" data-tab="admins" onclick="switchTab('admins')">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                Admins
-            </button>
-            <button class="tab-btn active-tab" data-tab="leaderboard" onclick="switchTab('leaderboard')">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                <span class="hidden sm:inline">Leaderboard</span>
-                <span class="sm:hidden">Ranks</span>
-            </button>
-            <button class="tab-btn" data-tab="analytics" onclick="switchTab('analytics')">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
-                Analytics
-            </button>
-            <button class="tab-btn" data-tab="questions" onclick="switchTab('questions')">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span class="hidden sm:inline">Questions</span>
-            </button>
-            <button class="tab-btn" data-tab="students" onclick="switchTab('students')">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                <span class="hidden sm:inline">Students</span>
-            </button>
-            <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <span class="hidden sm:inline">Settings</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Tab Content -->
-    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
-
-        <!-- ======= COLLEGES TAB (Main Admin only) ======= -->
-        <div id="tab-colleges" class="hidden">
-            <div class="glass-panel border border-dark-700 rounded-xl p-6 max-w-4xl mx-auto">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                    <div>
-                        <h2 class="text-xl font-bold text-white">College Management</h2>
-                        <p class="text-slate-400 text-sm">Add or manage colleges and their domains.</p>
-                    </div>
-                    <button onclick="openAddCollegeModal()"
-                            class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Add College
+            <nav class="flex-1 py-4">
+                <div id="mainAdminLinks" class="hidden">
+                    <button onclick="showTab('colleges')" class="sidebar-item w-full text-left px-6 py-3 flex items-center gap-3 hover:bg-white/5 active" id="tab-colleges">
+                        <span>Colleges</span>
+                    </button>
+                    <button onclick="showTab('accounts')" class="sidebar-item w-full text-left px-6 py-3 flex items-center gap-3 hover:bg-white/5" id="tab-accounts">
+                        <span>Mini Admins</span>
                     </button>
                 </div>
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-sm">
-                        <thead class="bg-dark-800/70">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Domain</th>
-                            </tr>
-                        </thead>
-                        <tbody id="collegesTableBody" class="divide-y divide-dark-700"></tbody>
-                    </table>
-                </div>
+                <button onclick="showTab('exams')" class="sidebar-item w-full text-left px-6 py-3 flex items-center gap-3 hover:bg-white/5" id="tab-exams">
+                    <span>Exams</span>
+                </button>
+                <button onclick="showTab('students')" class="sidebar-item w-full text-left px-6 py-3 flex items-center gap-3 hover:bg-white/5" id="tab-students">
+                    <span>Students</span>
+                </button>
+            </nav>
+            <div class="p-4 border-t border-dark-700">
+                <button onclick="logout()" class="w-full py-2 bg-dark-800 hover:bg-dark-700 text-slate-300 rounded-lg text-sm transition-all">Logout</button>
             </div>
-        </div>
+        </aside>
 
-        <!-- ======= ADMINS TAB (Main Admin only) ======= -->
-        <div id="tab-admins" class="hidden">
-            <div class="glass-panel border border-dark-700 rounded-xl p-6 max-w-4xl mx-auto">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Admin Accounts</h2>
-                        <p class="text-slate-400 text-sm">Create mini-admin accounts for specific colleges.</p>
-                    </div>
-                    <button onclick="openAddAdminModal()"
-                            class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Add Admin
-                    </button>
-                </div>
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-sm">
-                        <thead class="bg-dark-800/70">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Username</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">College</th>
-                            </tr>
-                        </thead>
-                        <tbody id="adminsTableBody" class="divide-y divide-dark-700"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ======= LEADERBOARD TAB ======= -->
-        <div id="tab-leaderboard">
-            <!-- Stat Cards -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
-                <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
-                    <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Total</p>
-                    <p id="statTotal" class="text-2xl md:text-3xl font-bold text-white">--</p>
-                </div>
-                <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
-                    <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Avg Score</p>
-                    <p id="statAvg" class="text-2xl md:text-3xl font-bold text-primary-400">--</p>
-                </div>
-                <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
-                    <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Highest</p>
-                    <p id="statHigh" class="text-2xl md:text-3xl font-bold text-emerald-400">--</p>
-                </div>
-                <div class="glass-panel rounded-xl p-4 md:p-5 border border-dark-700">
-                    <p id="statPassLabel" class="text-xs text-slate-500 uppercase tracking-widest mb-1">Pass ≥50%</p>
-                    <p id="statPass" class="text-2xl md:text-3xl font-bold text-yellow-400">--</p>
-                </div>
-            </div>
-
-            <!-- Table -->
-            <div class="glass-panel rounded-2xl border border-dark-700 overflow-hidden">
-                <div class="px-4 py-3 border-b border-dark-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <h2 class="font-semibold text-white">Student Rankings</h2>
-                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                        <input id="searchInput" type="text" placeholder="Search name or roll no..."
-                               class="px-3 py-1.5 text-sm bg-dark-800 border border-dark-700 rounded-lg focus:ring-1 focus:ring-primary-500 outline-none text-white placeholder-slate-500 flex-1 sm:w-44"
-                               oninput="filterTable(this.value)">
-                        <!-- Download split dropdown -->
-                        <div class="relative flex-shrink-0" id="downloadDropdownWrapper">
-                            <button onclick="toggleDownloadMenu(event)"
-                                    class="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors flex items-center gap-1.5">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                Download
-                                <svg class="w-3.5 h-3.5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                            </button>
-                            <!-- Dropdown menu -->
-                            <div id="downloadMenu"
-                                 class="absolute right-0 mt-1.5 w-36 bg-dark-800 border border-dark-700 rounded-lg shadow-xl z-50 hidden overflow-hidden">
-                                <button onclick="downloadPDF(); closeDownloadMenu()"
-                                        class="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors">
-                                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                                    PDF
-                                </button>
-                                <button onclick="downloadCSV(); closeDownloadMenu()"
-                                        class="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors border-t border-dark-700">
-                                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                    CSV
-                                </button>
-                            </div>
-                        </div>
-                        <button onclick="openClearUsersModal()"
-                                class="px-3 py-1.5 text-sm bg-red-600/20 hover:bg-red-600 border border-red-500/50 hover:border-red-500 text-red-400 hover:text-white rounded-lg font-medium transition-all flex items-center gap-1.5 flex-shrink-0">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            Clear Users
-                        </button>
-                    </div>
-                </div>
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-sm">
-                        <thead class="bg-dark-800/70" id="leaderboardHead">
-                            <tr>
-                                <!-- Column headers rendered dynamically by renderLeaderboard() -->
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Rank</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Student</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Roll No</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leaderboardBody" class="divide-y divide-dark-700">
-                            <tr><td colspan="4" class="text-center py-10 text-slate-500">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ======= ANALYTICS TAB ======= -->
-        <div id="tab-analytics" class="hidden">
-            <div class="flex flex-wrap gap-2 mb-6" id="sectionFilterBtns"></div>
-            <div class="glass-panel rounded-2xl border border-dark-700 p-6">
-                <h2 id="analyticsTitle" class="font-semibold text-white mb-6">Per-Question Performance</h2>
-                <div class="relative" style="height: 320px;">
-                    <canvas id="analyticsChart"></canvas>
-                </div>
-            </div>
-            <!-- Per-question table -->
-            <div class="mt-6 glass-panel rounded-2xl border border-dark-700 overflow-hidden">
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-sm">
-                        <thead class="bg-dark-800/70">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Question</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Correct</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Wrong</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Skipped</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">Success %</th>
-                            </tr>
-                        </thead>
-                        <tbody id="analyticsBody" class="divide-y divide-dark-700">
-                            <tr><td colspan="5" class="text-center py-10 text-slate-500">Select a section above</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ======= QUESTIONS TAB ======= -->
-        <div id="tab-questions" class="hidden">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
-                <div class="flex gap-2 flex-wrap" id="qSectionFilter"></div>
-                <div class="flex gap-2 w-full sm:w-auto">
-                    <button onclick="openQuestionModal(null)"
-                            class="flex-1 sm:flex-none px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Add Question
-                    </button>
-                    <!-- Bulk Add -->
-                    <div class="relative flex items-center group">
-                        <div class="flex items-center bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors overflow-hidden">
-                            <button onclick="triggerBulkUpload()"
-                                    class="pl-4 pr-2 py-2 text-white font-medium flex items-center justify-center gap-2 text-sm border-r border-emerald-500/30">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
-                                Bulk Add
-                            </button>
-                            <button onclick="showBulkInfo()" class="px-2 py-2 text-white/80 hover:text-white transition-colors" title="CSV Format Info">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </button>
-                        </div>
-                        <input type="file" id="bulkCsvInput" accept=".csv" class="hidden" onchange="handleBulkCsv(this)">
-                    </div>
-                    <!-- Delete All -->
-                    <button onclick="openClearQuestionsModal()"
-                            class="px-4 py-2 bg-red-600/20 hover:bg-red-600 border border-red-500/50 hover:border-red-500 text-red-400 hover:text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        Delete All
-                    </button>
-                </div>
-            </div>
-            <div id="questionsList" class="space-y-4">
-                <p class="text-slate-500 text-center py-10">Loading questions...</p>
-            </div>
-        </div>
-
-        <!-- ======= STUDENTS TAB ======= -->
-        <div id="tab-students" class="hidden">
-            <div class="glass-panel border border-dark-700 rounded-xl p-6 max-w-4xl mx-auto">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Student Management</h2>
-                        <p class="text-slate-400 text-sm">Add or delete students from the master list.</p>
-                    </div>
-                    <button onclick="openAddStudentModal()"
-                            class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Add Student
-                    </button>
-                </div>
-
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-sm">
-                        <thead class="bg-dark-800/70">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Roll No</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="studentsTableBody" class="divide-y divide-dark-700">
-                            <tr><td colspan="3" class="text-center py-10 text-slate-500">Loading students...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- ======= SETTINGS TAB (Exam Settings) ======= -->
-        <div id="tab-settings" class="hidden">
-            <div class="glass-panel border border-dark-700 rounded-xl p-6 max-w-2xl mx-auto">
-                <h2 class="text-xl font-bold text-white mb-1">Exam Settings</h2>
-                <p class="text-slate-400 text-sm mb-6">Edit the name, target colleges, and timer for the currently selected exam.</p>
-
-                <div class="space-y-5">
-                    <!-- Exam title -->
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1.5">Exam Title</label>
-                        <input type="text" id="examTitleInput" placeholder="e.g. Aptitude Test 1 — June 2026"
-                               class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 text-sm">
-                    </div>
-
-                    <!-- Timer -->
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1.5">Exam Start Time</label>
-                        <input type="datetime-local" id="timerStart"
-                               class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-1.5">Exam End Time</label>
-                        <input type="datetime-local" id="timerEnd"
-                               class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 text-sm">
-                    </div>
-
-                    <div id="timerError" class="hidden bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-lg"></div>
-                    <div id="timerSuccess" class="hidden bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 text-sm p-3 rounded-lg">Settings saved successfully.</div>
-
-                    <div class="pt-4 border-t border-dark-700 flex items-center justify-between">
-                        <button onclick="deleteCurrentExam()"
-                            class="px-4 py-2 text-sm text-red-400 border border-red-500/30 hover:bg-red-500/10 rounded-lg transition-colors">
-                            Delete This Exam
-                        </button>
-                        <button id="saveTimerBtn" onclick="saveExamSettings()"
-                                class="px-6 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors">
-                            Save Exam Settings
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
-</div>
-
-<!-- ======= QUESTION MODAL ======= -->
-<div id="questionModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-2 md:p-4">
-    <div class="bg-dark-800 border border-dark-700 rounded-xl md:rounded-2xl p-4 md:p-6 max-w-2xl w-full shadow-2xl max-h-[95dvh] overflow-y-auto custom-scrollbar">
-        <h3 id="modalTitle" class="text-xl font-bold text-white mb-6">Add Question</h3>
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Section</label>
-                <input type="text" id="mSection" list="sectionsList" placeholder="e.g. Age Calculation"
-                       class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500">
-                <datalist id="sectionsList"></datalist>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Question Text</label>
-                <textarea id="mQuestion" rows="3" placeholder="Enter the question..."
-                          class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 resize-none"></textarea>
-            </div>
-            <div class="grid grid-cols-1 gap-3">
-                <label class="block text-sm font-medium text-slate-300">Options <span class="text-slate-500 font-normal">(click the radio button to mark correct answer)</span></label>
-                <div id="optionsForm" class="space-y-2.5">
-                    <!-- Option inputs rendered by JS -->
-                </div>
-            </div>
-        </div>
-        <div id="modalError" class="hidden mt-4 bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-lg text-center"></div>
-        <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-dark-700">
-            <button onclick="closeQuestionModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors">Cancel</button>
-            <button id="modalSaveBtn" onclick="saveQuestion()" class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors">Save</button>
-        </div>
-    </div>
-</div>
-
-<!-- ======= DELETE CONFIRM MODAL ======= -->
-<div id="deleteModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-    <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-        <h3 class="text-xl font-bold text-white mb-2">Delete Question</h3>
-        <p class="text-slate-400 mb-6">Are you sure you want to delete this question? This action cannot be undone.</p>
-        <div class="flex justify-end gap-3">
-            <button onclick="closeDeleteModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors">Cancel</button>
-            <button id="confirmDeleteBtn" class="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors">Delete</button>
-        </div>
-    </div>
-</div>
-
-<!-- ======= CLEAR USERS CONFIRM MODAL ======= -->
-<div id="clearUsersModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-    <div class="bg-dark-800 border border-red-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center flex-shrink-0">
-                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            </div>
-            <h3 class="text-xl font-bold text-white">Clear All Users</h3>
-        </div>
-        <p class="text-slate-400 mb-2">This will permanently delete <span id="clearUsersCount" class="text-white font-semibold">all</span> student record(s) from the database.</p>
-        <p class="text-red-400 text-sm mb-6">⚠️ This cannot be undone. Use this only to reset before a new test.</p>
-        <div class="flex justify-end gap-3">
-            <button onclick="closeClearUsersModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors">Cancel</button>
-            <button id="confirmClearBtn" onclick="confirmClearUsers()" class="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors">Yes, Clear All</button>
-        </div>
-    </div>
-</div>
-
-<!-- ======= BULK INFO MODAL ======= -->
-<div id="bulkInfoModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-    <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl">
-        <h3 class="text-xl font-bold text-white mb-4">CSV Format Requirement</h3>
-        <p class="text-slate-400 mb-4 text-sm">Upload a CSV file with the following headers (order doesn't matter):</p>
-        <div class="bg-dark-900 rounded-lg p-4 mb-4 font-mono text-xs text-emerald-400 overflow-x-auto">
-            section,questionText,option1,option2,option3,option4,correctAnswer
-        </div>
-        <p class="text-slate-400 mb-6 text-sm">Note: <span class="text-white">correctAnswer</span> must exactly match one of the 4 options provided.</p>
-        <div class="flex justify-end">
-            <button onclick="closeBulkInfo()" class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors">Got it</button>
-        </div>
-    </div>
-</div>
-
-<!-- ======= CLEAR QUESTIONS CONFIRM MODAL ======= -->
-<div id="clearQuestionsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-    <div class="bg-dark-800 border border-red-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center flex-shrink-0">
-                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            </div>
-            <h3 class="text-xl font-bold text-white">Delete All Questions</h3>
-        </div>
-        <p class="text-slate-400 mb-2">This will permanently delete <span class="text-white font-semibold">ALL</span> questions from the database.</p>
-        <p class="text-red-400 text-sm mb-6">⚠️ This action cannot be undone.</p>
-        <div class="flex justify-end gap-3">
-            <button onclick="closeClearQuestionsModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors">Cancel</button>
-            <button id="confirmClearQuestionsBtn" onclick="confirmClearQuestions()" class="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors">Yes, Delete All</button>
-        </div>
-    </div>
-</div>
-
-<!-- ======= RESULT MODAL (REPLACES ALERT) ======= -->
-<div id="resultModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] hidden items-center justify-center p-4">
-    <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-        <div class="flex items-center gap-3 mb-4">
-            <div id="resultIconContainer" class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
-                <!-- Icon injected by JS -->
-            </div>
-            <h3 id="resultTitle" class="text-xl font-bold text-white">Result</h3>
-        </div>
-        <p id="resultMessage" class="text-slate-400 mb-6"></p>
-        <div class="flex justify-end">
-            <button onclick="closeResultModal()" class="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors">OK</button>
-        </div>
-    </div>
-</div>
-
-<!-- ======= CREATE EXAM MODAL ======= -->
-<div id="createExamModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-    <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-        <h3 class="text-xl font-bold text-white mb-1">Create New Exam</h3>
-        <p class="text-slate-400 text-sm mb-5">You can edit the timer and other settings after creation.</p>
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Exam Title</label>
-                <input type="text" id="newExamTitle" placeholder="e.g. Aptitude Test 1 — May 2026"
-                       class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 text-sm">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
+        <!-- Main Content -->
+        <main class="flex-1 p-6 md:p-10 overflow-y-auto">
+            <header class="flex justify-between items-center mb-8">
                 <div>
-                    <label class="block text-xs text-slate-400 mb-1">Start Time (optional)</label>
-                    <input type="datetime-local" id="newExamStart"
-                           class="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg focus:ring-1 focus:ring-primary-500 outline-none text-white text-sm">
+                    <h1 id="tabTitle" class="text-3xl font-bold text-white">Dashboard</h1>
+                    <p id="tabDescription" class="text-slate-400 mt-1"></p>
                 </div>
-                <div>
-                    <label class="block text-xs text-slate-400 mb-1">End Time (optional)</label>
-                    <input type="datetime-local" id="newExamEnd"
-                           class="w-full px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg focus:ring-1 focus:ring-primary-500 outline-none text-white text-sm">
+                <div class="flex items-center gap-4">
+                    <div id="collegeFilterContainer" class="hidden">
+                        <select id="collegeFilter" class="bg-dark-800 border border-dark-700 text-slate-200 text-sm rounded-lg p-2.5" onchange="loadCurrentTab()">
+                            <!-- Colleges populated here -->
+                        </select>
+                    </div>
+                    <p id="adminUsername" class="text-sm font-medium text-slate-300"></p>
+                </div>
+            </header>
+
+            <!-- ── Tab: Colleges ── -->
+            <div id="content-colleges" class="tab-content">
+                <div class="flex justify-end mb-4">
+                    <button onclick="openCollegeModal()" class="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all">Add College</button>
+                </div>
+                <div class="glass-panel rounded-xl overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-dark-800/50 text-slate-400 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4">College Name</th>
+                                <th class="px-6 py-4">Email Domain</th>
+                                <th class="px-6 py-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collegeList" class="divide-y divide-dark-700">
+                            <!-- Rows -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        </div>
-        <div id="createExamError" class="hidden mt-3 bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-lg"></div>
-        <div class="flex justify-end gap-3 mt-6">
-            <button onclick="closeCreateExamModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors text-sm">Cancel</button>
-            <button id="createExamBtn" onclick="confirmCreateExam()" class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors text-sm">Create</button>
+
+            <!-- ── Tab: Mini Admins ── -->
+            <div id="content-accounts" class="tab-content">
+                <div class="flex justify-end mb-4">
+                    <button onclick="openAccountModal()" class="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all">Add Mini Admin</button>
+                </div>
+                <div class="glass-panel rounded-xl overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-dark-800/50 text-slate-400 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4">Username</th>
+                                <th class="px-6 py-4">College</th>
+                                <th class="px-6 py-4">Password</th>
+                                <th class="px-6 py-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accountList" class="divide-y divide-dark-700">
+                            <!-- Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ── Tab: Exams ── -->
+            <div id="content-exams" class="tab-content">
+                <div class="flex justify-end mb-4">
+                    <button onclick="openExamModal()" class="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all">Create Exam</button>
+                </div>
+                <div id="examGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Cards -->
+                </div>
+            </div>
+
+            <!-- ── Tab: Students ── -->
+            <div id="content-students" class="tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="text-sm text-slate-400" id="studentCount">Total: 0</div>
+                    <button onclick="openStudentModal()" class="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all">Add Student</button>
+                </div>
+                <div class="glass-panel rounded-xl overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-dark-800/50 text-slate-400 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4">Roll No.</th>
+                                <th class="px-6 py-4">Name</th>
+                                <th class="px-6 py-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentList" class="divide-y divide-dark-700">
+                            <!-- Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ── View: Exam Details ── -->
+            <div id="content-exam-details" class="tab-content">
+                <button onclick="showTab('exams')" class="text-slate-400 hover:text-white flex items-center gap-1 mb-6 text-sm transition-all">
+                    ← Back to Exams
+                </button>
+                <div class="flex flex-wrap gap-4 mb-8">
+                    <button onclick="showSubTab('leaderboard')" class="subtab-item px-4 py-2 rounded-lg text-sm font-medium bg-dark-800 text-slate-400 active" id="subtab-leaderboard">Leaderboard</button>
+                    <button onclick="showSubTab('questions')" class="subtab-item px-4 py-2 rounded-lg text-sm font-medium bg-dark-800 text-slate-400" id="subtab-questions">Questions</button>
+                    <button onclick="showSubTab('analytics')" class="subtab-item px-4 py-2 rounded-lg text-sm font-medium bg-dark-800 text-slate-400" id="subtab-analytics">Analytics</button>
+                </div>
+
+                <!-- Sub-Tab: Leaderboard -->
+                <div id="subcontent-leaderboard" class="subtab-content">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-white">Rankings</h3>
+                        <button onclick="clearUsers()" class="text-red-400 hover:text-red-300 text-xs border border-red-500/20 px-3 py-1 rounded-lg hover:bg-red-500/5 transition-all">Clear All Results</button>
+                    </div>
+                    <div class="glass-panel rounded-xl overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-dark-800/50 text-slate-400 text-xs uppercase tracking-wider">
+                                <tr>
+                                    <th class="px-6 py-4">Rank</th>
+                                    <th class="px-6 py-4">Student</th>
+                                    <th class="px-6 py-4">Score</th>
+                                    <th class="px-6 py-4">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboardList" class="divide-y divide-dark-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Sub-Tab: Questions -->
+                <div id="subcontent-questions" class="subtab-content hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-white">Question Bank</h3>
+                        <div class="flex gap-2">
+                            <button onclick="openBulkModal()" class="bg-dark-800 hover:bg-dark-700 text-slate-300 px-4 py-2 rounded-lg text-sm font-medium transition-all">Bulk Upload</button>
+                            <button onclick="openQuestionModal()" class="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all">Add Question</button>
+                        </div>
+                    </div>
+                    <div id="questionList" class="space-y-4"></div>
+                </div>
+
+                <!-- Sub-Tab: Analytics -->
+                <div id="subcontent-analytics" class="subtab-content hidden">
+                    <h3 class="text-xl font-bold text-white mb-4">Performance Analytics</h3>
+                    <div id="analyticsList" class="space-y-6"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MODALS                                                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    
+    <!-- Modal Container -->
+    <div id="modalOverlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <!-- Generic Modal -->
+        <div id="modalContent" class="glass-panel w-full max-w-lg p-8 rounded-2xl shadow-2xl relative animate-fade-in max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-500 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div id="modalBody"></div>
         </div>
     </div>
-</div>
 
-<!-- ======= ADD STUDENT MODAL ======= -->
-<div id="addStudentModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-    <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-        <h3 class="text-xl font-bold text-white mb-6">Add New Student</h3>
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Roll Number</label>
-                <input type="number" id="newStudentRoll" placeholder="e.g. 1"
-                       class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 text-sm">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-300 mb-1.5">Full Name</label>
-                <input type="text" id="newStudentName" placeholder="e.g. John Doe"
-                       class="w-full px-4 py-2.5 bg-dark-900 border border-dark-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-white placeholder-slate-500 text-sm">
-            </div>
-        </div>
-        <div id="addStudentError" class="hidden mt-4 bg-red-500/10 border border-red-500/40 text-red-400 text-sm p-3 rounded-lg text-center"></div>
-        <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-dark-700">
-            <button onclick="closeAddStudentModal()" class="px-5 py-2 border border-dark-600 rounded-lg text-slate-300 hover:bg-dark-700 transition-colors">Cancel</button>
-            <button onclick="confirmAddStudent()" class="px-5 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors">Add Student</button>
-        </div>
-    </div>
-</div>
-
-<style>
-.tab-btn {
-    display: flex; align-items: center; gap: 6px;
-    padding: 12px 16px; font-size: 0.875rem; font-weight: 500;
-    color: #94a3b8; border-bottom: 2px solid transparent;
-    transition: all 0.2s; white-space: nowrap;
-}
-.tab-btn:hover { color: #f1f5f9; }
-.active-tab { color: #3b82f6 !important; border-bottom-color: #3b82f6; }
-.filter-pill {
-    padding: 6px 14px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;
-    border: 1px solid #334155; color: #94a3b8; background: transparent;
-    cursor: pointer; transition: all 0.15s;
-}
-.filter-pill:hover { border-color: #64748b; color: #f1f5f9; }
-.filter-pill.active-pill { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.5); color: #3b82f6; }
-</style>
-
-<script src="js/api.js"></script>
-<script src="js/admin.js"></script>
+    <script src="js/admin.js"></script>
 </body>
 </html>

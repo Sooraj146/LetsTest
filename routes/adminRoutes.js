@@ -22,8 +22,13 @@ const {
 const {
   login,
   createCollege,
+  updateCollege,
+  deleteCollege,
   getColleges,
-  createAdminAccount
+  createAdminAccount,
+  getAdminAccounts,
+  updateAdminAccount,
+  deleteAdminAccount
 } = require('../controllers/authController');
 
 const router = express.Router();
@@ -34,10 +39,14 @@ router.post('/login', login);
 router.use(adminAuth);
 
 // ── Management (Main Admin only) ───────────────────────────────────
-router.get('/colleges',    getColleges);
-router.post('/colleges',   createCollege);
-router.get('/accounts',    require('../controllers/authController').getAdminAccounts);
-router.post('/accounts',   createAdminAccount);
+router.get('/colleges',      getColleges);
+router.post('/colleges',     createCollege);
+router.put('/colleges/:id',    updateCollege);
+router.delete('/colleges/:id', deleteCollege);
+router.get('/accounts',      getAdminAccounts);
+router.post('/accounts',     createAdminAccount);
+router.put('/accounts/:id',    updateAdminAccount);
+router.delete('/accounts/:id', deleteAdminAccount);
 
 // ── Student management ─────────────────────────────────────────────
 router.get('/students',     getStudents);

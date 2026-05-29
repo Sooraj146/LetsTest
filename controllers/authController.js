@@ -10,15 +10,23 @@ exports.seedInitialAdmin = async () => {
       console.log('Seeded default college: GEC Thrissur');
     }
 
-    const mainAdmin = await AdminAccount.findOne({ username: 'Sooraj2004' });
+    const username = process.env.MAIN_ADMIN_USERNAME || 'Sooraj2004';
+    const password = process.env.MAIN_ADMIN_PASSWORD || 'McaAdminSooraj';
+
+    const mainAdmin = await AdminAccount.findOne({ role: 'main' });
     if (!mainAdmin) {
       await AdminAccount.create({
-        username: 'Sooraj2004',
-        password: 'McaAdminSooraj',
+        username,
+        password,
         role: 'main',
-        collegeId: null // Main admin has no specific college binding by default, but handles all
+        collegeId: null
       });
-      console.log('Seeded main admin: Sooraj2004');
+      console.log(`Seeded main admin: ${username}`);
+    } else {
+      // Update existing main admin credentials if they changed in .env
+      mainAdmin.username = username;
+      mainAdmin.password = password;
+      await mainAdmin.save();
     }
   } catch (error) {
     console.error('Seeding error:', error);
@@ -37,6 +45,7 @@ exports.login = async (req, res) => {
       username: admin.username,
       role: admin.role,
       college: admin.collegeId,
+      password: admin.password // Returning password for header-based auth in subsequent requests
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -51,6 +60,33 @@ exports.createCollege = async (req, res) => {
     const { name, domain } = req.body;
     const college = await College.create({ name, domain });
     res.status(201).json(college);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Update a college (Main Admin only)
+// @route PUT /api/admin/colleges/:id
+exports.updateCollege = async (req, res) => {
+  if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
+  try {
+    const { name, domain } = req.body;
+    const college = await College.findByIdAndUpdate(req.params.id, { name, domain }, { new: true });
+    if (!college) return res.status(404).json({ message: 'College not found' });
+    res.status(200).json(college);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Delete a college (Main Admin only)
+// @route DELETE /api/admin/colleges/:id
+exports.deleteCollege = async (req, res) => {
+  if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
+  try {
+    const college = await College.findByIdAndDelete(req.params.id);
+    if (!college) return res.status(404).json({ message: 'College not found' });
+    res.status(200).json({ message: 'College deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -88,6 +124,33 @@ exports.createAdminAccount = async (req, res) => {
     const { username, password, collegeId } = req.body;
     const account = await AdminAccount.create({ username, password, collegeId, role: 'mini' });
     res.status(201).json(account);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Update a mini admin (Main Admin only)
+// @route PUT /api/admin/accounts/:id
+exports.updateAdminAccount = async (req, res) => {
+  if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
+  try {
+    const { username, password, collegeId } = req.body;
+    const account = await AdminAccount.findByIdAndUpdate(req.params.id, { username, password, collegeId }, { new: true });
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+    res.status(200).json(account);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Delete a mini admin (Main Admin only)
+// @route DELETE /api/admin/accounts/:id
+exports.deleteAdminAccount = async (req, res) => {
+  if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
+  try {
+    const account = await AdminAccount.findByIdAndDelete(req.params.id);
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+    res.status(200).json({ message: 'Account deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
