@@ -1,90 +1,8 @@
-const User = require('../models/User');
+const User     = require('../models/User');
 const Question = require('../models/Question');
-const Student = require('../models/Student');
+const Exam     = require('../models/Exam');
 
-// Helper — get collegeId from admin or query (if main admin)
-function getCollegeId(req) {
-  if (req.admin.role === 'main') {
-    return req.query.collegeId || req.body.collegeId;
-  }
-  return req.admin.collegeId;
-}
-
-// @desc  Get all pre-populated students
-// @route GET /api/admin/students
-exports.getStudents = async (req, res) => {
-  try {
-    const collegeId = getCollegeId(req);
-    if (!collegeId) return res.status(400).json({ message: 'collegeId is required for main admin' });
-    const students = await Student.find({ collegeId }).sort({ rollNumber: 1 });
-    res.status(200).json(students);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc  Add a student
-// @route POST /api/admin/students
-exports.addStudent = async (req, res) => {
-  try {
-    const { name, rollNumber } = req.body;
-    const collegeId = getCollegeId(req);
-    if (!name || rollNumber === undefined || !collegeId) {
-      return res.status(400).json({ message: 'Name, roll number and collegeId are required' });
-    }
-    const student = await Student.create({ name, rollNumber, collegeId });
-    res.status(201).json(student);
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Roll number already exists for this college' });
-    }
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc  Delete a student
-// @route DELETE /api/admin/students/:id
-exports.deleteStudent = async (req, res) => {
-  try {
-    const student = await Student.findByIdAndDelete(req.params.id);
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.status(200).json({ message: 'Student deleted' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc  Bulk add students
-// @route POST /api/admin/students/bulk
-exports.bulkAddStudents = async (req, res) => {
-  try {
-    const { collegeId, students } = req.body;
-    if (!collegeId || !Array.isArray(students)) {
-      return res.status(400).json({ message: 'collegeId and students array are required' });
-    }
-
-    const withCollegeId = students.map(s => ({ ...s, collegeId }));
-    
-    // We use insertMany with ordered: false to continue even if some fail (e.g. duplicate roll numbers)
-    const result = await Student.insertMany(withCollegeId, { ordered: false });
-    
-    res.status(201).json({
-      message: `${result.length} students added successfully.`,
-      count: result.length
-    });
-  } catch (error) {
-    if (error.code === 11000 || (error.writeErrors && error.writeErrors.length > 0)) {
-      const insertedCount = error.insertedDocs ? error.insertedDocs.length : 0;
-      return res.status(201).json({
-        message: `Processed with some duplicates. ${insertedCount} new students added.`,
-        count: insertedCount
-      });
-    }
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Helper — require examId query param
+// Helper — require examId from query or body
 function requireExamId(req, res) {
   const examId = req.query.examId || req.body.examId;
   if (!examId) {
@@ -257,28 +175,28 @@ exports.bulkAddQuestions = async (req, res) => {
       return res.status(400).json({ message: 'Invalid questions data' });
     }
 
-    // Attach examId to every question
-    const withExamId = questions.map(q => ({ ...q, examId }));
-    await Question.insertMany(withExamId);
+    // Deduplicate against existing questions for this exam
+    const existing       = await Question.find({ examId }).select('questionText');
+    const existingTexts  = new Set(existing.map(q => q.questionText.trim()));
 
-    // Remove duplicates based on trimmed questionText within this exam
-    const duplicates = await Question.aggregate([
-      { $match: { examId: require('mongoose').Types.ObjectId.createFromHexString(examId) } },
-      { $project: { trimmedText: { $trim: { input: '$questionText' } }, original: '$$ROOT' } },
-      { $group: { _id: '$trimmedText', ids: { $push: '$original._id' }, count: { $sum: 1 } } },
-      { $match: { count: { $gt: 1 } } },
-    ]);
+    const toInsert              = [];
+    const uniqueIncomingTexts   = new Set();
 
-    let deletedCount = 0;
-    for (const group of duplicates) {
-      const idsToDelete = group.ids.slice(1);
-      const r = await Question.deleteMany({ _id: { $in: idsToDelete } });
-      deletedCount += r.deletedCount;
+    for (const q of questions) {
+      const trimmedText = q.questionText.trim();
+      if (!existingTexts.has(trimmedText) && !uniqueIncomingTexts.has(trimmedText)) {
+        toInsert.push({ ...q, examId });
+        uniqueIncomingTexts.add(trimmedText);
+      }
     }
 
+    if (toInsert.length > 0) await Question.insertMany(toInsert);
+
+    const skippedCount = questions.length - toInsert.length;
     res.status(201).json({
-      message: `${questions.length} questions processed. ${deletedCount} duplicates removed.`,
-      insertedCount: questions.length - deletedCount,
+      message:       `${toInsert.length} new questions added. ${skippedCount} duplicates skipped.`,
+      insertedCount: toInsert.length,
+      skippedCount,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

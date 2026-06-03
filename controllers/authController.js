@@ -58,7 +58,8 @@ exports.createCollege = async (req, res) => {
   if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
   try {
     const { name, domain } = req.body;
-    const college = await College.create({ name, domain });
+    const cleanDomain = domain.toLowerCase().trim();
+    const college = await College.create({ name, domain: cleanDomain });
     res.status(201).json(college);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -71,7 +72,11 @@ exports.updateCollege = async (req, res) => {
   if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
   try {
     const { name, domain } = req.body;
-    const college = await College.findByIdAndUpdate(req.params.id, { name, domain }, { new: true });
+    const cleanDomain = domain ? domain.toLowerCase().trim() : undefined;
+    const updateData = { name };
+    if (cleanDomain) updateData.domain = cleanDomain;
+
+    const college = await College.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!college) return res.status(404).json({ message: 'College not found' });
     res.status(200).json(college);
   } catch (error) {

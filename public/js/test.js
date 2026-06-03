@@ -1,416 +1,296 @@
-// ================================================================
-// Mobile Sidebar Toggle
-// ================================================================
-function openSidebar() {
-    document.getElementById('sidebar').classList.remove('-translate-x-full');
-    document.getElementById('sidebarOverlay').classList.remove('hidden');
-    document.body.style.overflow = 'hidden'; // prevent background scroll
+/**
+ * test.js — Professional Examination Engine
+ */
+
+// ── State ────────────────────────────────────────────────────────────
+let questions    = [];
+let currentIdx   = 0;
+let answers      = {}; // questionId -> optionIndex (0-3)
+let reviewState  = new Set(); // questionIds marked for review
+let student      = null;
+let examId       = null;
+
+// ── Elements ─────────────────────────────────────────────────────────
+const questionContainer = document.getElementById('questionContainer');
+const optionsContainer  = document.getElementById('optionsContainer');
+const questionText      = document.getElementById('questionText');
+const prevBtn           = document.getElementById('prevBtn');
+const nextBtn           = document.getElementById('nextBtn');
+const sectionNav        = document.getElementById('sectionNav');
+const loader            = document.getElementById('loader');
+
+// ── Initialization ───────────────────────────────────────────────────
+
+function notify(message, type = 'info') {
+    const container = document.getElementById('notificationContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    const colors = { success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', error: 'bg-red-500/10 border-red-500/20 text-red-400', info: 'bg-primary-500/10 border-primary-500/20 text-primary-400' };
+    const icons = { success: 'check-circle', error: 'alert-circle', info: 'info' };
+    toast.className = `glass flex items-center gap-3 px-6 py-4 rounded-2xl border ${colors[type]} animate-slide-up pointer-events-auto shadow-2xl`;
+    toast.innerHTML = `<i data-lucide="${icons[type]}" class="w-5 h-5"></i><span class="text-sm font-bold uppercase tracking-tight">${message}</span>`;
+    container.appendChild(toast);
+    if (window.lucide) lucide.createIcons();
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-20px)';
+        toast.style.transition = 'all 0.5s ease-out';
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
 }
-function closeSidebar() {
-    document.getElementById('sidebar').classList.add('-translate-x-full');
-    document.getElementById('sidebarOverlay').classList.add('hidden');
-    document.body.style.overflow = '';
+
+function confirmAction(title, message, type = 'danger') {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('confirmOverlay');
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMessage').textContent = message;
+        const proceedBtn = document.getElementById('confirmProceedBtn');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+        overlay.classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+        const cleanup = (val) => { overlay.classList.add('hidden'); proceedBtn.onclick = null; cancelBtn.onclick = null; resolve(val); };
+        proceedBtn.onclick = () => cleanup(true);
+        cancelBtn.onclick = () => cleanup(false);
+    });
 }
-// Auto-close sidebar on mobile when a question number is tapped
-function closeSidebarOnMobile() {
-    if (window.innerWidth < 768) closeSidebar();
+
+function refreshIcons() {
+    if (window.lucide) lucide.createIcons();
+}
+
+function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // --- Auth Check ---
-    const sessionUserStr = sessionStorage.getItem('user');
-    if (!sessionUserStr) { window.location.href = '/'; return; }
-    const user = JSON.parse(sessionUserStr);
-    if (!user.examId) { window.location.href = '/'; return; }  // must have an exam
-    if (user.isSubmitted) { window.location.href = `/result.html?examId=${user.examId}`; return; }
+    const userStr = sessionStorage.getItem('user');
+    if (!userStr) { window.location.href = '/'; return; }
 
-    document.getElementById('studentName').textContent = user.name;
+    student = JSON.parse(userStr);
+    examId  = student.examId;
+    
+    document.getElementById('studentName').textContent = student.name.toUpperCase();
+    refreshIcons();
 
-    // --- State ---
-    let questions = [];
-    let sections = [];
-    let currentSectionIndex = 0;
-    let currentQuestionIndex = 0;
-    let expandedSections = new Set([0]); // track which section dropdowns are open
-
-    const savedAnswersKey = `answers_${user.rollNumber}`;
-    let answers = JSON.parse(localStorage.getItem(savedAnswersKey)) || {};
-
-    // --- DOM ---
-    const sectionNav         = document.getElementById('sectionNav');
-    const currentSectionTitle = document.getElementById('currentSectionTitle');
-    const currentQuestionNum  = document.getElementById('currentQuestionNum');
-    const questionText        = document.getElementById('questionText');
-    const optionsContainer    = document.getElementById('optionsContainer');
-    const prevBtn             = document.getElementById('prevBtn');
-    const nextBtn             = document.getElementById('nextBtn');
-    const loader              = document.getElementById('loader');
-    const questionContainer   = document.getElementById('questionContainer');
-    const progressText        = document.getElementById('progressText');
-    const progressBar         = document.getElementById('progressBar');
-
-    // --- Seeded PRNG helpers ---
-    // Converts rollNumber string → 32-bit integer seed
-    function hashSeed(str) {
-        let h = 0;
-        for (let i = 0; i < str.length; i++) {
-            h = Math.imul(31, h) + str.charCodeAt(i) | 0;
-        }
-        return h >>> 0;
-    }
-    // mulberry32 — fast, seedable PRNG
-    function mulberry32(seed) {
-        return function () {
-            seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-            let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-            t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-            return ((t ^ t >>> 14) >>> 0) / 4294967296;
-        };
-    }
-    // Fisher-Yates shuffle using supplied rng
-    function seededShuffle(arr, rng) {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(rng() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-        return arr;
-    }
-
-    // --- Fetch Questions ---
     try {
         loader.classList.remove('hidden');
-        const raw = await api.getQuestions(user.examId);
+        let rawQuestions = await api.getQuestions(examId);
+        loader.classList.add('hidden');
 
-        // Group by section preserving insertion order
-        const grouped = {};
-        raw.forEach(q => {
-            if (!grouped[q.section]) grouped[q.section] = [];
-            grouped[q.section].push(q);
+        if (!rawQuestions || !rawQuestions.length) {
+            notify('No questions detected for this assessment.', 'error');
+            return;
+        }
+
+        // Group by section, shuffle options, and shuffle questions within section
+        const sectionMap = {};
+        rawQuestions.forEach(q => {
+            const sec = q.section || 'General Section';
+            if (!sectionMap[sec]) sectionMap[sec] = [];
+            // Map original options to keep track of true indices
+            q.shuffledOptions = shuffleArray(q.options.map((text, idx) => ({ text, originalIndex: idx })));
+            sectionMap[sec].push(q);
         });
 
-        // Seeded shuffle: same student → same order every time (resumable)
-        const rng = mulberry32(hashSeed(user.rollNumber));
-        sections = Object.keys(grouped);
-        sections.forEach(sec => {
-            seededShuffle(grouped[sec], rng);          // shuffle questions within section
-            grouped[sec].forEach(q => {
-                q.options = seededShuffle([...q.options], rng);  // shuffle options
-            });
-            questions = questions.concat(grouped[sec]);
+        questions = [];
+        Object.keys(sectionMap).forEach(sec => {
+            const shuffledQs = shuffleArray(sectionMap[sec]);
+            questions.push(...shuffledQs);
         });
 
-        initButtons();
         renderSidebar();
-        renderQuestion();
+        showQuestion(0);
         updateProgress();
 
+    } catch (err) {
         loader.classList.add('hidden');
-        questionContainer.classList.remove('opacity-0');
-    } catch (err) {
-        alert('Failed to load questions. Please refresh.');
-        console.error(err);
-    }
-
-    // --- Timer Logic ---
-    try {
-        const settings = await api.getExam(user.examId);
-        if (settings.endTime) {
-            const endD = new Date(settings.endTime);
-            const timerContainer = document.getElementById('testTimerContainer');
-            const timerDisplay = document.getElementById('testTimerDisplay');
-            timerContainer.style.display = 'block';
-
-            const updateTimer = () => {
-                const diff = endD - new Date();
-                if (diff <= 0) {
-                    clearInterval(window.testTimerInterval);
-                    timerDisplay.textContent = '00:00';
-                    timerDisplay.classList.remove('text-primary-400');
-                    timerDisplay.classList.add('text-red-400');
-                    // Auto submit
-                    submitTest();
-                    return;
-                }
-
-                const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
-                const m = Math.floor((diff / 1000 / 60) % 60);
-                const s = Math.floor((diff / 1000) % 60);
-
-                let timeStr = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-                if (h > 0) timeStr = `${h.toString().padStart(2, '0')}:` + timeStr;
-                
-                timerDisplay.textContent = timeStr;
-                
-                // Turn red when less than 5 minutes left
-                if (diff < 5 * 60 * 1000) {
-                    timerDisplay.classList.remove('text-primary-400');
-                    timerDisplay.classList.add('text-red-400', 'animate-pulse');
-                    timerContainer.classList.remove('border-primary-500/30');
-                    timerContainer.classList.add('border-red-500/50');
-                }
-            };
-            
-            updateTimer();
-            window.testTimerInterval = setInterval(updateTimer, 1000);
-        }
-    } catch (err) {
-        console.error('Failed to load timer settings', err);
-    }
-
-    // --- Init nav buttons ---
-    function initButtons() {
-        prevBtn.addEventListener('click', () => {
-            if (currentQuestionIndex > 0) {
-                currentQuestionIndex--;
-                updateSectionIndex();
-                renderSidebar();
-                renderQuestion();
-            }
-        });
-        nextBtn.addEventListener('click', () => {
-            if (currentQuestionIndex < questions.length - 1) {
-                currentQuestionIndex++;
-                updateSectionIndex();
-                renderSidebar();
-                renderQuestion();
-            }
-        });
-
-        document.getElementById('finalSubmitBtn').addEventListener('click', openModal);
-        document.getElementById('cancelSubmitBtn').addEventListener('click', closeModal);
-        document.getElementById('confirmSubmitBtn').addEventListener('click', submitTest);
-    }
-
-    function updateSectionIndex() {
-        const q = questions[currentQuestionIndex];
-        currentSectionIndex = sections.indexOf(q.section);
-        expandedSections.add(currentSectionIndex); // auto-expand active section
-    }
-
-    // ================================================================
-    // SIDEBAR — section headers + question-number grid with tick marks
-    // ================================================================
-    function renderSidebar() {
-        sectionNav.innerHTML = '';
-
-        sections.forEach((sec, secIdx) => {
-            const secQuestions  = questions.filter(q => q.section === sec);
-            const answeredInSec = secQuestions.filter(q => answers[q._id]).length;
-            const isCompleted   = answeredInSec === secQuestions.length;
-            const isActive      = secIdx === currentSectionIndex;
-            const isExpanded    = expandedSections.has(secIdx);
-
-            // Wrapper
-            const wrapper = document.createElement('div');
-            wrapper.className = 'mb-1';
-
-            // ---- Section Header ----
-            const header = document.createElement('button');
-            header.className = `w-full flex justify-between items-center px-3 py-2.5 rounded-lg transition-all text-left ${
-                isActive
-                    ? 'bg-primary-600/20 border border-primary-500/40 text-white'
-                    : 'border border-transparent hover:bg-dark-800 text-slate-400 hover:text-white'
-            }`;
-            header.innerHTML = `
-                <div class="flex items-center gap-2 min-w-0">
-                    ${isCompleted
-                        ? `<svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                           </svg>`
-                        : `<span class="w-4 h-4 flex-shrink-0 inline-block"></span>`}
-                    <span class="font-medium text-sm truncate">${sec}</span>
-                </div>
-                <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                    <span class="text-xs ${isActive ? 'text-primary-400' : 'text-slate-600'}">${answeredInSec}/${secQuestions.length}</span>
-                    <svg class="w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''} ${isActive ? 'text-primary-400' : 'text-slate-600'}"
-                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </div>`;
-
-            header.addEventListener('click', () => {
-                // Toggle expand/collapse for this section
-                if (expandedSections.has(secIdx)) {
-                    if (secIdx !== currentSectionIndex) expandedSections.delete(secIdx);
-                } else {
-                    expandedSections.add(secIdx);
-                }
-                // Navigate to first question in this section
-                closeSidebarOnMobile();
-                const firstIdx = questions.findIndex(q => q.section === sec);
-                currentQuestionIndex = firstIdx;
-                currentSectionIndex = secIdx;
-                expandedSections.add(secIdx);
-                renderSidebar();
-                renderQuestion();
-            });
-
-            // ---- Question Number Grid (dropdown) ----
-            const dropdown = document.createElement('div');
-            dropdown.className = `overflow-hidden transition-all duration-200 ${isExpanded ? '' : 'hidden'}`;
-
-            const grid = document.createElement('div');
-            grid.className = 'grid grid-cols-6 gap-1.5 px-2 py-2 mt-0.5';
-
-            secQuestions.forEach((q, qIdxInSec) => {
-                const isAnswered = !!answers[q._id];
-                const globalIdx  = questions.indexOf(q);
-                const isCurrent  = globalIdx === currentQuestionIndex;
-
-                const btn = document.createElement('button');
-                btn.title = `Question ${qIdxInSec + 1}`;
-                btn.className = `relative flex items-center justify-center h-8 rounded-md text-xs font-bold transition-all duration-150 ${
-                    isCurrent
-                        ? 'bg-primary-600 text-white shadow-lg shadow-primary-900/50 ring-2 ring-primary-400 ring-offset-1 ring-offset-dark-900'
-                        : isAnswered
-                            ? 'bg-green-500/15 text-green-400 border border-green-500/40 hover:bg-green-500/30'
-                            : 'bg-dark-800 text-slate-500 border border-dark-700 hover:border-slate-500 hover:text-slate-300'
-                }`;
-
-                btn.innerHTML = `${qIdxInSec + 1}
-                    ${isAnswered && !isCurrent
-                        ? `<span class="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-dark-900"></span>`
-                        : ''}`;
-
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    currentQuestionIndex = globalIdx;
-                    currentSectionIndex  = secIdx;
-                    expandedSections.add(secIdx);
-                    closeSidebarOnMobile();
-                    renderSidebar();
-                    renderQuestion();
-                });
-
-                grid.appendChild(btn);
-            });
-
-            dropdown.appendChild(grid);
-            wrapper.appendChild(header);
-            wrapper.appendChild(dropdown);
-            sectionNav.appendChild(wrapper);
-        });
-    }
-
-    // ================================================================
-    // QUESTION RENDERER
-    // ================================================================
-    function renderQuestion() {
-        questionContainer.classList.add('opacity-0');
-        setTimeout(() => {
-            const q = questions[currentQuestionIndex];
-            const sectionQs = questions.filter(qst => qst.section === q.section);
-            const posInSection = sectionQs.indexOf(q) + 1;
-
-            currentSectionTitle.textContent = q.section;
-            currentQuestionNum.textContent  = posInSection;
-            document.getElementById('sectionTotalNum').textContent = sectionQs.length;
-            questionText.textContent        = q.questionText;
-            optionsContainer.innerHTML      = '';
-
-            q.options.forEach((opt) => {
-                const isSelected = answers[q._id] === opt;
-
-                const label = document.createElement('label');
-                label.className = `option-wrapper flex items-center p-4 rounded-xl border transition-all cursor-pointer ${
-                    isSelected ? 'selected' : 'border-dark-700 bg-dark-800 hover:bg-dark-700'
-                }`;
-                label.innerHTML = `
-                    <input type="radio" name="q_${q._id}" value="${opt}" class="radio-custom" ${isSelected ? 'checked' : ''}>
-                    <span class="ml-4 option-label text-slate-300 font-medium">${opt}</span>`;
-
-                label.querySelector('input').addEventListener('change', (e) => {
-                    answers[q._id] = e.target.value;
-                    localStorage.setItem(savedAnswersKey, JSON.stringify(answers));
-
-                    // Update option styles without full re-render
-                    Array.from(optionsContainer.children).forEach(c => {
-                        c.classList.remove('selected');
-                        c.classList.add('border-dark-700', 'bg-dark-800');
-                    });
-                    label.classList.add('selected');
-                    label.classList.remove('border-dark-700', 'bg-dark-800');
-
-                    updateProgress();
-                    renderSidebar();
-                    updateNextBtn(); // re-check submit eligibility after each answer
-                });
-
-                optionsContainer.appendChild(label);
-            });
-
-            prevBtn.disabled = currentQuestionIndex === 0;
-            updateNextBtn();
-            questionContainer.classList.remove('opacity-0');
-        }, 150);
-    }
-
-    function updateProgress() {
-        const answered = Object.keys(answers).length;
-        const total    = questions.length;
-        progressText.textContent = `${answered}/${total}`;
-        progressBar.style.width  = `${(answered / total) * 100}%`;
-    }
-
-    function updateNextBtn() {
-        const isLastQuestion  = currentQuestionIndex === questions.length - 1;
-        const allAnswered     = Object.keys(answers).length === questions.length;
-
-        if (isLastQuestion && allAnswered) {
-            // Override Next → Submit (green, glowing)
-            nextBtn.disabled = false;
-            nextBtn.className = 'px-4 md:px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-900/40 transition-all flex items-center gap-2 text-sm ring-2 ring-emerald-400/30 animate-pulse';
-            nextBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Submit`;
-            // Clicking this Next-as-Submit opens the confirm modal
-            nextBtn.onclick = openModal;
-        } else if (isLastQuestion) {
-            // Last question but not all answered — keep as disabled Next
-            nextBtn.disabled = true;
-            nextBtn.className = 'px-4 md:px-6 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white font-medium shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-sm';
-            nextBtn.innerHTML = `Next <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`;
-            nextBtn.onclick = null;
-        } else {
-            // Normal Next — navigate forward
-            nextBtn.disabled = false;
-            nextBtn.className = 'px-4 md:px-6 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white font-medium shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-sm';
-            nextBtn.innerHTML = `Next <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`;
-            nextBtn.onclick = null; // handled by initButtons listener
-        }
-    }
-
-    // ================================================================
-    // MODAL
-    // ================================================================
-    function openModal() {
-        const modal = document.getElementById('submitModal');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        setTimeout(() => modal.classList.remove('opacity-0'), 10);
-    }
-    function closeModal() {
-        const modal = document.getElementById('submitModal');
-        modal.classList.add('opacity-0');
-        setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 300);
-    }
-
-    // ================================================================
-    // SUBMIT
-    // ================================================================
-    async function submitTest() {
-        const btn = document.getElementById('confirmSubmitBtn');
-        btn.disabled = true;
-        btn.textContent = 'Submitting...';
-        try {
-            await api.submitTest({ rollNumber: user.rollNumber, examId: user.examId, answers });
-            user.isSubmitted = true;
-            sessionStorage.setItem('user', JSON.stringify(user));
-            localStorage.removeItem(savedAnswersKey);
-            window.location.href = `/result.html?examId=${user.examId}`;
-        } catch (err) {
-            alert(err.message || 'Submission failed');
-            btn.disabled = false;
-            btn.textContent = 'Yes, Submit';
-            closeModal();
-        }
+        notify('Connection failure. Please try again.', 'error');
     }
 });
+
+function renderSidebar() {
+    const grouped = questions.reduce((acc, q, idx) => {
+        const s = q.section || 'General Section';
+        if (!acc[s]) acc[s] = [];
+        acc[s].push({ ...q, globalIdx: idx });
+        return acc;
+    }, {});
+
+
+    sectionNav.innerHTML = Object.entries(grouped).map(([name, qs]) => `
+        <div class="space-y-4">
+            <div class="flex items-center gap-3 px-2">
+                <span class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">${name}</span>
+                <div class="h-px flex-1 bg-white/5"></div>
+            </div>
+            <div class="grid grid-cols-5 gap-2">
+                ${qs.map(q => {
+                    const isAnswered = answers[q._id] !== undefined;
+                    const isReviewed = reviewState.has(q._id);
+                    const isActive = currentIdx === q.globalIdx;
+                    
+                    let stateClass = 'bg-white/5 text-slate-600 border-white/5 hover:bg-white/10 hover:text-slate-400';
+                    let iconHtml = qs.indexOf(q) + 1;
+
+                    if (isActive) {
+                        stateClass = 'bg-primary-600 text-white border-primary-400 shadow-[0_0_15px_rgba(59,130,246,0.4)] scale-110 z-10';
+                    } else if (isReviewed) {
+                        stateClass = 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+                        iconHtml = '<i data-lucide="bookmark" class="w-3.5 h-3.5"></i>';
+                    } else if (isAnswered) {
+                        stateClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+                        iconHtml = '<i data-lucide="check" class="w-3.5 h-3.5"></i>';
+                    }
+
+                    return `
+                        <button onclick="showQuestion(${q.globalIdx})" id="nav-q-${q.globalIdx}" 
+                            class="w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black transition-all duration-300 border ${stateClass}">
+                            ${iconHtml}
+                        </button>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `).join('');
+    refreshIcons();
+}
+
+function showQuestion(idx) {
+    currentIdx = idx;
+    const q = questions[idx];
+
+    // Tactical Header Sync
+    document.getElementById('currentSectionTitle').textContent = (q.section || 'Assessment Section').toUpperCase();
+    document.getElementById('currentQuestionNum').textContent = idx + 1;
+    document.getElementById('sectionTotalNum').textContent = questions.length;
+    
+    // Direct question text update
+    questionText.textContent = q.questionText;
+
+    // Sync Review State
+    const revBtn = document.getElementById('reviewBtn');
+    if (reviewState.has(q._id)) {
+        revBtn.innerHTML = '<i data-lucide="bookmark-check" class="w-5 h-5"></i> Marked';
+        revBtn.classList.add('bg-purple-500/20', 'text-white', 'border-purple-500/40');
+    } else {
+        revBtn.innerHTML = '<i data-lucide="bookmark" class="w-5 h-5"></i> Mark for Review';
+        revBtn.classList.remove('bg-purple-500/20', 'text-white', 'border-purple-500/40');
+    }
+
+    // Render Options Matrix
+    const labels = ['A', 'B', 'C', 'D'];
+    optionsContainer.innerHTML = q.shuffledOptions.map((optObj, i) => {
+        const isSelected = answers[q._id] === optObj.originalIndex;
+        return `
+        <button onclick="saveAnswer('${q._id}', ${optObj.originalIndex})" 
+            class="w-full text-left p-6 rounded-[2.5rem] border transition-all duration-300 group flex items-center gap-6 relative overflow-hidden
+            ${isSelected 
+                ? 'bg-primary-500/10 border-primary-500/50 text-white shadow-[0_0_30px_rgba(59,130,246,0.1)]' 
+                : 'bg-dark-900/40 border-white/5 text-slate-400 hover:border-white/10 hover:bg-white/[0.03]'}">
+            
+            ${isSelected ? '<div class="absolute inset-0 bg-primary-500/5 animate-pulse"></div>' : ''}
+            
+            <div class="relative w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs transition-all duration-500
+                ${isSelected 
+                    ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/40 rotate-[360deg]' 
+                    : 'bg-white/5 text-slate-500 group-hover:bg-white/10 group-hover:text-slate-300'}">
+                ${labels[i]}
+            </div>
+            
+            <span class="relative flex-1 font-bold text-sm md:text-base leading-relaxed tracking-tight transition-colors
+                ${isSelected ? 'text-white' : 'group-hover:text-slate-200'}">
+                ${optObj.text}
+            </span>
+            
+            <div class="relative w-6 h-6 rounded-full border-2 transition-all duration-500 flex items-center justify-center
+                ${isSelected 
+                    ? 'border-primary-400 bg-primary-400/20 scale-110' 
+                    : 'border-slate-800 scale-90 opacity-0 group-hover:opacity-100'}">
+                <i data-lucide="check" class="w-3.5 h-3.5 text-white ${isSelected ? 'opacity-100' : 'opacity-0'}"></i>
+            </div>
+        </button>
+    `}).join('');
+
+    questionContainer.classList.remove('opacity-0');
+    questionContainer.style.opacity = '1';
+    
+    updateNavState();
+    renderSidebar();
+    refreshIcons();
+}
+
+function toggleReview() {
+    const qId = questions[currentIdx]._id;
+    if (reviewState.has(qId)) reviewState.delete(qId);
+    else reviewState.add(qId);
+    
+    // Auto navigate to next
+    if (currentIdx < questions.length - 1) {
+        showQuestion(currentIdx + 1);
+    } else {
+        showQuestion(currentIdx);
+    }
+}
+
+function saveAnswer(qId, optIdx) {
+    answers[qId] = optIdx;
+    showQuestion(currentIdx);
+    updateProgress();
+}
+
+function updateProgress() {
+    const total = questions.length;
+    const answered = Object.keys(answers).length;
+    const pct = (answered / total) * 100;
+    
+    document.getElementById('progressText').textContent = `${answered}/${total}`;
+    document.getElementById('progressBar').style.width = `${pct}%`;
+}
+
+function updateNavState() {
+    prevBtn.disabled = currentIdx === 0;
+    
+    const isLast = currentIdx === questions.length - 1;
+    const allAnswered = Object.keys(answers).length === questions.length;
+
+    if (isLast && allAnswered) {
+        nextBtn.innerHTML = 'Submit Assessment <i data-lucide="shield-check" class="w-5 h-5 ml-1"></i>';
+        nextBtn.classList.remove('btn-primary');
+        nextBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+        nextBtn.onclick = () => submitTest();
+    } else {
+        nextBtn.innerHTML = 'Proceed <i data-lucide="chevron-right" class="w-5 h-5 transition-transform group-hover:translate-x-1"></i>';
+        nextBtn.classList.add('btn-primary');
+        nextBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+        nextBtn.onclick = () => currentIdx < questions.length - 1 && showQuestion(currentIdx + 1);
+    }
+    refreshIcons();
+}
+
+prevBtn.onclick = () => currentIdx > 0 && showQuestion(currentIdx - 1);
+
+async function submitTest() {
+    const count = Object.keys(answers).length;
+    const ok = await confirmAction('SUBMIT ASSESSMENT', `You have answered ${count} of ${questions.length} questions. Are you sure you want to submit?`, 'info');
+    if (!ok) return;
+
+    try {
+        await api.submitTest({
+            rollNumber: student.rollNumber,
+            examId: examId,
+            answers: answers
+        });
+        window.location.href = `/result.html?examId=${examId}&rollNumber=${student.rollNumber}`;
+    } catch (err) {
+        notify('Error submitting assessment. Please try again.', 'error');
+    }
+}
+
+document.getElementById('finalSubmitBtn').onclick = submitTest;
+
+function openSidebar() { document.getElementById('sidebar').classList.remove('-translate-x-full'); document.getElementById('sidebarOverlay').classList.remove('hidden'); }
+function closeSidebar() { document.getElementById('sidebar').classList.add('-translate-x-full'); document.getElementById('sidebarOverlay').classList.add('hidden'); }

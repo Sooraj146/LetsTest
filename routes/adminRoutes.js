@@ -1,5 +1,5 @@
-const express = require('express');
-const adminAuth = require('../middleware/adminAuth');
+const express    = require('express');
+const adminAuth  = require('../middleware/adminAuth');
 const {
   getLeaderboard,
   getQuestionAnalytics,
@@ -10,54 +10,21 @@ const {
   clearAllUsers,
   clearAllQuestions,
   bulkAddQuestions,
-  getStudents,
-  addStudent,
-  deleteStudent,
-  bulkAddStudents,
 } = require('../controllers/adminController');
 const {
   createExam,
   updateExam,
   deleteExam,
 } = require('../controllers/examController');
-const {
-  login,
-  createCollege,
-  updateCollege,
-  deleteCollege,
-  getColleges,
-  createAdminAccount,
-  getAdminAccounts,
-  updateAdminAccount,
-  deleteAdminAccount
-} = require('../controllers/authController');
 
 const router = express.Router();
 
-// Public admin routes (login)
-router.post('/login', login);
-
+// All admin routes require password header (handled by adminAuth middleware)
 router.use(adminAuth);
 
-// ── Management (Main Admin only) ───────────────────────────────────
-router.get('/colleges',      getColleges);
-router.post('/colleges',     createCollege);
-router.put('/colleges/:id',    updateCollege);
-router.delete('/colleges/:id', deleteCollege);
-router.get('/accounts',      getAdminAccounts);
-router.post('/accounts',     createAdminAccount);
-router.put('/accounts/:id',    updateAdminAccount);
-router.delete('/accounts/:id', deleteAdminAccount);
-
-// ── Student management ─────────────────────────────────────────────
-router.get('/students',      getStudents);
-router.post('/students',     addStudent);
-router.post('/students/bulk', bulkAddStudents);
-router.delete('/students/:id', deleteStudent);
-
 // ── Exam management ────────────────────────────────────────────────
-router.post('/exams',      createExam);
-router.put('/exams/:id',   updateExam);
+router.post('/exams',       createExam);
+router.put('/exams/:id',    updateExam);
 router.delete('/exams/:id', deleteExam);
 
 // ── Leaderboard + analytics (require ?examId=xxx) ──────────────────

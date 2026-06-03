@@ -1,11 +1,19 @@
-// Central API helper — all fetch calls go through here
+// Central API helper — Hardened Version
 const api = {
   // ── Exams ──────────────────────────────────────────────────────────
-  getExams: () =>
-    fetch('/api/exams').then(r => r.json()),
+  getExams: (collegeId) =>
+    fetch(`/api/users/exams?collegeId=${collegeId}`).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || 'Failed to fetch assessments');
+      return data;
+    }),
 
   getExam: (examId) =>
-    fetch(`/api/exams/${examId}`).then(r => r.json()),
+    fetch(`/api/exams/${examId}`).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || 'Failed to load assessment details');
+      return data;
+    }),
 
   // ── Student registration / submission ──────────────────────────────
   register: ({ name, rollNumber, email, examId }) =>
@@ -33,33 +41,40 @@ const api = {
   getResult: (examId, rollNumber) =>
     fetch(`/api/users/result/${examId}/${rollNumber}`).then(async r => {
       const data = await r.json();
-      if (!r.ok) throw new Error(data.message || 'Failed to load result');
+      if (!r.ok) throw new Error(data.message || 'Failed to load result analysis');
       return data;
     }),
 
-  // Returns { [examId]: { isSubmitted, totalScore } } for the student
   getMyExams: ({ rollNumber, email }) =>
     fetch('/api/users/my-exams', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ rollNumber, email }),
-    }).then(r => r.json()),
+    }).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || 'Failed to sync your history');
+      return data;
+    }),
 
   getStudentName: (rollNumber, domain) =>
     fetch(`/api/users/student/${rollNumber}?domain=${encodeURIComponent(domain)}`).then(async r => {
       const data = await r.json();
-      if (!r.ok) throw new Error(data.message || 'Student not found');
+      if (!r.ok) throw new Error(data.message || 'Student identity not verified');
       return data;
     }),
 
   // ── Questions ──────────────────────────────────────────────────────
   getQuestions: (examId) =>
-    fetch(`/api/questions?examId=${examId}`).then(r => r.json()),
+    fetch(`/api/questions?examId=${examId}`).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || 'Failed to sync question modules');
+      return data;
+    }),
 
   getAnswerKey: (examId) =>
-    fetch(`/api/questions/answer-key?examId=${examId}`).then(r => r.json()),
-
-  // ── Settings (legacy shim — now reads from exam) ───────────────────
-  getSettings: (examId) =>
-    fetch(`/api/exams/${examId}`).then(r => r.json()),
+    fetch(`/api/questions/answer-key?examId=${examId}`).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || 'Answer key unavailable');
+      return data;
+    }),
 };

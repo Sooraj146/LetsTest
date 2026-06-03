@@ -1,26 +1,24 @@
-const AdminAccount = require('../models/AdminAccount');
-const College = require('../models/College');
+/**
+ * adminAuth.js — Simple password-based middleware.
+ *
+ * The admin panel sends the password via the "x-admin-password" header.
+ * We compare it against ADMIN_PASSWORD in .env (falls back to a default).
+ * No database lookup required — no AdminAccount model needed.
+ */
 
-const adminAuth = async (req, res, next) => {
-  const username = req.headers['x-admin-username'];
+const adminAuth = (req, res, next) => {
   const password = req.headers['x-admin-password'];
+  const expected = process.env.ADMIN_PASSWORD || process.env.MAIN_ADMIN_PASSWORD;
 
-  if (!username || !password) {
-    return res.status(401).json({ message: 'Unauthorized: Missing credentials' });
+  if (!password) {
+    return res.status(401).json({ message: 'Unauthorized: No password provided' });
   }
 
-  try {
-    const admin = await AdminAccount.findOne({ username, password });
-    if (!admin) {
-      return res.status(401).json({ message: 'Unauthorized: Invalid credentials' });
-    }
-
-    // Attach admin info to request
-    req.admin = admin;
-    next();
-  } catch (error) {
-    res.status(500).json({ message: 'Server error during authentication' });
+  if (password !== expected) {
+    return res.status(401).json({ message: 'Unauthorized: Incorrect password' });
   }
+
+  next();
 };
 
 module.exports = adminAuth;

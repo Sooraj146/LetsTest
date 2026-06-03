@@ -1,30 +1,50 @@
+let currentExamId = null;
+let studentRoll = null;
+
+function notify(message, type = 'info') {
+    const container = document.getElementById('notificationContainer');
+    const toast = document.createElement('div');
+    const colors = { success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', error: 'bg-red-500/10 border-red-500/20 text-red-400', info: 'bg-primary-500/10 border-primary-500/20 text-primary-400' };
+    const icons = { success: 'check-circle', error: 'alert-circle', info: 'info' };
+    toast.className = `glass flex items-center gap-3 px-6 py-4 rounded-2xl border ${colors[type]} animate-slide-up pointer-events-auto shadow-2xl`;
+    toast.innerHTML = `<i data-lucide="${icons[type]}" class="w-5 h-5"></i><span class="text-sm font-bold">${message}</span>`;
+    container.appendChild(toast);
+    if (window.lucide) lucide.createIcons();
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-20px)';
+        toast.style.transition = 'all 0.5s ease-out';
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
-    const sessionUserStr = sessionStorage.getItem('user');
-    if (!sessionUserStr) { window.location.href = '/'; return; }
+    const params = new URLSearchParams(window.location.search);
+    currentExamId = params.get('examId');
+    studentRoll   = params.get('rollNumber');
 
-    const user    = JSON.parse(sessionUserStr);
-    // examId comes from URL (?examId=xxx) — allows direct linking from exam dashboard
-    const examId  = new URLSearchParams(window.location.search).get('examId') || user.examId;
-    if (!examId) { window.location.href = '/'; return; }
-
-    document.getElementById('studentGreeting').textContent = `Great job, ${user.name}! Here are your results.`;
+    if (!currentExamId || !studentRoll) {
+        const user = JSON.parse(sessionStorage.getItem('user'));
+        if (!user) { window.location.href = '/'; return; }
+        currentExamId = user.examId;
+        studentRoll   = user.rollNumber;
+    }
 
     try {
-        const result = await api.getResult(examId, user.rollNumber);
+        const result = await api.getResult(currentExamId, studentRoll);
 
-        // --- Populate counts ---
+        // Professional ID display
+        document.getElementById('studentGreeting').textContent = `${result.name.toUpperCase()} / ROLL NUMBER ${result.rollNumber}`;
+
         document.getElementById('centerScore').textContent = result.totalScore;
         document.getElementById('totalQuestionsLabel').textContent = result.totalQuestions ?? '?';
+
         document.getElementById('correctCount').textContent = result.correctCount;
         document.getElementById('wrongCount').textContent = result.wrongCount;
         document.getElementById('skippedCount').textContent = result.unattemptedCount;
+        const accuracy = result.answeredCount > 0 ? Math.round((result.correctCount / result.answeredCount) * 100) : 0;
+        document.getElementById('accuracyBadge').textContent = `${accuracy}% Precision`;
 
-        const accuracy = result.answeredCount > 0
-            ? Math.round((result.correctCount / result.answeredCount) * 100)
-            : 0;
-        document.getElementById('accuracyBadge').textContent = `${accuracy}% Accuracy`;
-
-        // --- Donut Chart ---
         const ctx = document.getElementById('donutChart').getContext('2d');
         new Chart(ctx, {
             type: 'doughnut',
@@ -32,184 +52,153 @@ document.addEventListener('DOMContentLoaded', async () => {
                 labels: ['Correct', 'Wrong', 'Skipped'],
                 datasets: [{
                     data: [result.correctCount, result.wrongCount, result.unattemptedCount],
-                    backgroundColor: [
-                        'rgba(16, 185, 129, 0.85)',  // emerald
-                        'rgba(239, 68, 68, 0.85)',    // red
-                        'rgba(71, 85, 105, 0.6)',     // slate
-                    ],
-                    borderColor: [
-                        'rgba(16, 185, 129, 1)',
-                        'rgba(239, 68, 68, 1)',
-                        'rgba(71, 85, 105, 1)',
-                    ],
-                    borderWidth: 2,
-                    hoverOffset: 8,
+                    backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(71, 85, 105, 0.4)'],
+                    borderColor: '#020617', borderWidth: 4, hoverOffset: 15,
                 }]
             },
             options: {
-                cutout: '70%',
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => ` ${ctx.label}: ${ctx.raw} questions`
-                        }
-                    }
-                },
-                animation: { animateRotate: true, duration: 1200, easing: 'easeInOutQuart' }
+                cutout: '80%', responsive: true, maintainAspectRatio: true,
+                layout: { padding: 20 },
+                plugins: { legend: { display: false }, tooltip: { enabled: true, backgroundColor: 'rgba(15, 23, 42, 0.9)', titleFont: { size: 12, weight: 'bold' }, padding: 12, cornerRadius: 12 } },
+                animation: { animateRotate: true, duration: 1500, easing: 'easeOutQuart' }
             }
         });
 
-        // --- Section Breakdown bars ---
         const container = document.getElementById('sectionScoresContainer');
         container.innerHTML = '';
         const sections = Object.keys(result.sectionScores);
-
-        sections.forEach((sec) => {
-            const score = result.sectionScores[sec];
-            const sectionTotal = (result.sectionTotals && result.sectionTotals[sec]) || 6;
-            const pct = (score / sectionTotal) * 100;
-            let barColor = 'bg-primary-500';
-            if (pct === 100) barColor = 'bg-emerald-500';
-            else if (pct < 50)  barColor = 'bg-red-500';
-            else if (pct < 80)  barColor = 'bg-yellow-500';
+        sections.forEach((sec, idx) => {
+            let score = result.sectionScores[sec];
+            let sectionTotal = (result.sectionTotals && result.sectionTotals[sec]) || 1;
+            let correctPct = (score / sectionTotal) * 100;
+            let wrongPct = 0;
+            
+            if (result.sectionDetails && result.sectionDetails[sec]) {
+                const detail = result.sectionDetails[sec];
+                score = detail.correct;
+                sectionTotal = detail.total || 1;
+                correctPct = (detail.correct / sectionTotal) * 100;
+                wrongPct = (detail.wrong / sectionTotal) * 100;
+            }
 
             const div = document.createElement('div');
-            div.className = 'bg-dark-900/50 p-4 rounded-xl border border-dark-700';
+            div.className = 'space-y-2 p-4 bg-dark-900/40 rounded-2xl border border-white/5 hover:border-white/10 transition-colors';
             div.innerHTML = `
-                <div class="flex justify-between items-center mb-2">
-                    <span class="font-medium text-slate-200 text-sm">${sec}</span>
-                    <span class="text-sm font-bold text-white">${score}<span class="text-slate-500 font-normal">/${sectionTotal}</span></span>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-black uppercase tracking-widest text-slate-300 truncate pr-2">${sec}</span>
+                    <span class="text-sm font-black text-white whitespace-nowrap flex items-center gap-1 bg-dark-950 px-3 py-1.5 rounded-lg border border-slate-800 shadow-inner">${score} <span class="text-slate-600">/ ${sectionTotal}</span></span>
                 </div>
-                <div class="w-full bg-dark-800 rounded-full h-2.5 overflow-hidden">
-                    <div class="progress-bar ${barColor} h-2.5 rounded-full transition-all duration-1000 ease-out" style="width:0%"></div>
-                </div>`;
+                <div class="h-2 w-full bg-dark-950 rounded-full overflow-hidden border border-slate-800 flex">
+                    <div class="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-1000 ease-out relative overflow-hidden" style="width: 0%" id="bar-correct-${idx}">
+                        <div class="absolute inset-0 bg-white/20 w-1/2 -skew-x-12 translate-x-[-100%] animate-[shimmer_2s_infinite]"></div>
+                    </div>
+                    <div class="h-full bg-gradient-to-r from-red-500 to-red-600 transition-all duration-1000 ease-out" style="width: 0%" id="bar-wrong-${idx}"></div>
+                </div>
+            `;
             container.appendChild(div);
-            // Brief timeout so browser renders 0% first, then animates
-            setTimeout(() => { div.querySelector('.progress-bar').style.width = `${pct}%`; }, 120);
+            setTimeout(() => { 
+                const cBar = document.getElementById(`bar-correct-${idx}`);
+                const wBar = document.getElementById(`bar-wrong-${idx}`);
+                if (cBar) cBar.style.width = `${correctPct}%`;
+                if (wBar) wBar.style.width = `${wrongPct}%`;
+            }, 200);
         });
-
-    } catch (error) {
-        console.error(error);
-        alert('Failed to load results: ' + error.message);
-    }
+    } catch (err) { console.error(err); notify('Analysis retrieval failed.', 'error'); }
 });
 
-// ================================================================
-// ANSWER KEY PDF (generated dynamically from live DB questions)
-// ================================================================
 async function downloadAnswerKey() {
     const btn = document.getElementById('answerKeyBtn');
+    const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<svg class="animate-spin w-5 h-5 text-primary-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Generating...`;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Generating PDF...</span>';
+    if (window.lucide) lucide.createIcons();
 
     try {
-        const resp = await fetch(`/api/questions/answer-key?examId=${examId}`);
-        if (!resp.ok) throw new Error('Failed to fetch answer key');
-        const data = await resp.json();   // { sections: [...], questions: { section: [...] } }
-
+        const resp = await fetch(`/api/questions/answer-key?examId=${currentExamId}`);
+        if (!resp.ok) throw new Error('Answer key not available.');
+        const data = await resp.json();
+        
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('portrait', 'mm', 'a4');
-        const pageWidth = doc.internal.pageSize.width;
-        const margin = 14;
-        const colW = pageWidth - margin * 2;
-
-        // ── Title ──
-        doc.setFontSize(20);
-        doc.setTextColor(30, 41, 59);
-        doc.text('MCA Test — Answer Key', margin, 18);
-
-        doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 25);
-
-        let y = 32;
-        let qNum = 0;
-
+        const doc = new jsPDF('p', 'mm', 'a4');
+        
+        // Professional Corporate Header
+        doc.setFillColor(15, 23, 42); // slate-950
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22); 
+        doc.setFont('helvetica', 'bold');
+        doc.text('OFFICIAL ANSWER KEY', 14, 22);
+        
+        doc.setFontSize(10); 
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Assessment ID: ${currentExamId}`, 14, 30); 
+        doc.text(`Candidate Roll: ${studentRoll}`, 14, 35);
+        
+        let y = 45;
+        
         data.sections.forEach(section => {
-            const qs = data.questions[section];
-
-            // ── Section header ──
-            if (y > 265) { doc.addPage(); y = 16; }
-            doc.setFontSize(11);
-            doc.setTextColor(37, 99, 235);
-            doc.setFont(undefined, 'bold');
-            doc.text(section, margin, y);
-            doc.setFont(undefined, 'normal');
-            y += 6;
-
-            qs.forEach(q => {
-                qNum++;
-                const optionLabels = ['A', 'B', 'C', 'D'];
-
-                // Question text (wrapped)
-                doc.setFontSize(9.5);
-                doc.setTextColor(30, 41, 59);
-                const qLines = doc.splitTextToSize(`Q${qNum}. ${q.questionText}`, colW);
-                const qBlockH = qLines.length * 5 + 2;
-
-                if (y + qBlockH + 28 > 282) { doc.addPage(); y = 16; }
-
-                doc.text(qLines, margin, y);
-                y += qBlockH;
-
-                // Options
+            const questions = data.questions[section];
+            
+            if (y > 260) { doc.addPage(); y = 20; }
+            
+            // Section Header (Pill-like shape)
+            doc.setFillColor(241, 245, 249);
+            doc.setDrawColor(203, 213, 225);
+            doc.rect(14, y, 182, 10, 'FD');
+            doc.setFontSize(11); 
+            doc.setTextColor(30, 41, 59); 
+            doc.setFont('helvetica', 'bold'); 
+            doc.text(section.toUpperCase(), 18, y + 6.5);
+            y += 16;
+            
+            questions.forEach((q, i) => {
+                if (y > 270) { doc.addPage(); y = 20; }
+                
+                // Question Text
+                doc.setFontSize(10); 
+                doc.setTextColor(30, 41, 59); 
+                doc.setFont('helvetica', 'bold');
+                const qText = doc.splitTextToSize(`Q${i + 1}. ${q.questionText}`, 170); 
+                doc.text(qText, 14, y); 
+                y += (qText.length * 5) + 3;
+                
+                // Options List
+                doc.setFont('helvetica', 'normal');
                 q.options.forEach((opt, idx) => {
-                    const isCorrect = opt === q.correctAnswer;
-                    const label = `   ${optionLabels[idx]}. `;
-
-                    const optLines = doc.splitTextToSize(label + opt, colW - 6);
-                    const optH = optLines.length * 4.5 + 1;
-
-                    if (y + optH > 282) { doc.addPage(); y = 16; }
-
-                    if (isCorrect) {
-                        // Highlight correct answer row
-                        doc.setFillColor(220, 252, 231); // light green
-                        doc.roundedRect(margin - 1, y - 3.5, colW + 2, optH + 1, 1.5, 1.5, 'F');
-                        doc.setTextColor(22, 101, 52);   // dark green text
-                        doc.setFont(undefined, 'bold');
-                    } else {
-                        doc.setTextColor(71, 85, 105);
-                        doc.setFont(undefined, 'normal');
+                    const isCorrect = String(idx) === String(q.correctAnswer);
+                    
+                    if (isCorrect) { 
+                        doc.setFillColor(220, 252, 231); // emerald-100
+                        doc.setDrawColor(16, 185, 129);  // emerald-500
+                    } else { 
+                        doc.setFillColor(255, 255, 255);
+                        doc.setDrawColor(226, 232, 240); // slate-200
                     }
-
-                    doc.setFontSize(9);
-                    doc.text(optLines, margin + 1, y);
-                    y += optH;
+                    
+                    const optText = doc.splitTextToSize(`${String.fromCharCode(65 + idx)}. ${opt}`, 160);
+                    const boxHeight = (optText.length * 5) + 4;
+                    
+                    if (y + boxHeight > 285) { doc.addPage(); y = 20; }
+                    
+                    doc.rect(20, y, 170, boxHeight, 'FD');
+                    
+                    if (isCorrect) {
+                        doc.setTextColor(6, 95, 70); // emerald-800
+                        doc.setFont('helvetica', 'bold');
+                    } else {
+                        doc.setTextColor(100, 116, 139); // slate-500
+                        doc.setFont('helvetica', 'normal');
+                    }
+                    
+                    doc.text(optText, 24, y + 5); 
+                    y += boxHeight + 2;
                 });
-
-                // Correct answer label — use plain ASCII, jsPDF standard font
-                // doesn't support Unicode symbols (★ renders as spaced garbage)
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(22, 101, 52);
-                const ansLabel = `[ANS] ${q.correctAnswer}`;
-                const ansLines = doc.splitTextToSize(ansLabel, colW - 10);
-                doc.text(ansLines, margin + 4, y);
-                doc.setFont(undefined, 'normal');
-                y += ansLines.length * 4.5 + 5; // gap between questions
+                y += 6;
             });
-
-            y += 4; // extra gap between sections
         });
-
-        // ── Page numbers ──
-        const pages = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pages; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.setTextColor(148, 163, 184);
-            doc.text(`MCA Test — Answer Key | Page ${i} of ${pages}`, margin, doc.internal.pageSize.height - 8);
-        }
-
-        doc.save(`MCA_Test_Answer_Key_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (err) {
-        alert('Could not generate answer key: ' + err.message);
-        console.error(err);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> Download Answer Key`;
-    }
+        
+        doc.save(`AnswerKey_Roll_${studentRoll}.pdf`);
+        notify('Answer key downloaded', 'success');
+    } catch (err) { notify(err.message, 'error'); } finally { btn.disabled = false; btn.innerHTML = originalText; if (window.lucide) lucide.createIcons(); }
 }
+

@@ -3,127 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exam Results — Let's Test</title>
+    <title>Performance Analysis — Let's Test</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155' },
-                        primary: { 500: '#3b82f6', 600: '#2563eb' },
-                        accent: '#8b5cf6'
+                        dark: { 950: '#020617', 900: '#0f172a', 800: '#1e293b', 700: '#334155', 600: '#475569' },
+                        primary: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' },
+                        accent: { 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed' }
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+                    animation: {
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                        'blob': 'blob 7s infinite',
+                        'shimmer': 'shimmer 2s infinite linear',
+                    },
+                    keyframes: {
+                        slideUp: { from: { opacity: '0', transform: 'translateY(20px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+                        fadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
+                        blob: { '0%,100%': { transform: 'translate(0,0) scale(1)' }, '33%': { transform: 'translate(30px,-50px) scale(1.1)' }, '66%': { transform: 'translate(-20px,20px) scale(0.9)' } },
+                        shimmer: { '100%': { transform: 'translateX(200%)' } }
+                    }
                 }
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%); transition: all 0.3s; }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </head>
-<body class="bg-dark-900 text-slate-200 font-sans min-h-[100dvh] flex items-center justify-center relative p-3 md:p-8">
-    <!-- Background blobs -->
-    <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-600 rounded-full filter blur-[128px] opacity-20"></div>
-        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent rounded-full filter blur-[128px] opacity-20"></div>
-    </div>
+<body class="bg-dark-950 text-slate-200 font-sans min-h-screen selection:bg-primary-500/30 overflow-x-hidden p-6 md:p-12">
 
-    <div class="glass-panel w-full max-w-5xl p-5 md:p-12 rounded-2xl md:rounded-3xl shadow-2xl">
-        <div class="text-center mb-7 md:mb-10">
-            <div class="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full bg-green-500/20 border border-green-500/40 mb-3 md:mb-4">
-                <svg class="w-6 h-6 md:w-8 md:h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    <!-- Notification Engine -->
+    <div id="notificationContainer" class="fixed top-6 left-1/2 -translate-x-1/2 z-[300] flex flex-col gap-3 w-full max-w-sm pointer-events-none"></div>
+
+    <!-- Professional Background -->
+    <div class="fixed inset-0 pointer-events-none -z-10 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950"></div>
+
+
+    <div class="max-w-5xl w-full mx-auto animate-fade-in">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
+            <div class="flex items-center gap-6">
+                <div class="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 border border-emerald-500/20 shadow-lg shadow-emerald-500/5">
+                    <i data-lucide="check-circle" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-black text-white leading-tight">Assessment <span class="text-primary-500">Summary</span></h1>
+                    <p id="studentGreeting" class="text-slate-500 text-sm mt-1 uppercase tracking-widest font-bold"></p>
+                </div>
             </div>
-            <h1 class="text-2xl md:text-4xl font-bold text-white mb-2">Test <span class="text-primary-500">Completed!</span></h1>
-            <p id="studentGreeting" class="text-slate-400 text-base md:text-lg">Loading your results...</p>
+            <div class="flex gap-3">
+                <button onclick="window.location.href='/'" class="px-6 py-3 glass rounded-2xl text-slate-400 hover:text-white transition-all text-sm font-bold flex items-center gap-2">
+                    <i data-lucide="home" class="w-4 h-4"></i> Dashboard
+                </button>
+            </div>
         </div>
 
-        <!-- Main Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-8 items-start">
-
-            <!-- LEFT: Donut Chart -->
-            <div class="bg-dark-800/60 border border-dark-700 rounded-xl md:rounded-2xl p-5 md:p-6 flex flex-col items-center">
-                <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-widest mb-4 md:mb-6">Answer Breakdown</h3>
-                <div class="relative w-40 h-40 md:w-52 md:h-52">
+        <!-- Main Analysis Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-12">
+            
+            <!-- Overall Score (Large) -->
+            <div class="lg:col-span-5 glass rounded-[2.5rem] p-10 flex flex-col items-center justify-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-right from-primary-500 to-accent-500 opacity-20"></div>
+                <h3 class="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-10">Score distribution</h3>
+                
+                <div class="relative w-full max-w-[280px] aspect-square mb-10">
                     <canvas id="donutChart"></canvas>
-                    <!-- Center label -->
                     <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span id="centerScore" class="text-4xl font-bold text-white">--</span>
-                        <span class="text-slate-400 text-sm">/ <span id="totalQuestionsLabel">--</span> correct</span>
+                        <div class="flex items-baseline gap-2">
+                            <span id="centerScore" class="text-6xl font-black text-white">--</span>
+                            <span class="text-2xl font-black text-slate-700">/</span>
+                            <span id="totalQuestionsLabel" class="text-2xl font-black text-slate-500">--</span>
+                        </div>
+                        <span class="text-[10px] text-slate-600 uppercase font-black tracking-[0.2em] mt-1">Total Points Scored</span>
                     </div>
                 </div>
-                <!-- Legend -->
-                <div class="mt-6 grid grid-cols-3 gap-4 w-full text-center">
-                    <div>
-                        <div class="flex items-center justify-center gap-1.5 mb-1">
-                            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                            <span class="text-xs text-slate-400">Correct</span>
-                        </div>
-                        <p id="correctCount" class="text-xl font-bold text-emerald-400">--</p>
+
+                <div class="grid grid-cols-3 gap-6 w-full">
+                    <div class="text-center">
+                        <p class="text-[10px] font-black uppercase text-slate-500 mb-2">Correct</p>
+                        <p id="correctCount" class="text-xl font-black text-emerald-400">--</p>
                     </div>
-                    <div>
-                        <div class="flex items-center justify-center gap-1.5 mb-1">
-                            <span class="w-3 h-3 rounded-full bg-red-500"></span>
-                            <span class="text-xs text-slate-400">Wrong</span>
-                        </div>
-                        <p id="wrongCount" class="text-xl font-bold text-red-400">--</p>
+                    <div class="text-center">
+                        <p class="text-[10px] font-black uppercase text-slate-500 mb-2">Wrong</p>
+                        <p id="wrongCount" class="text-xl font-black text-red-400">--</p>
                     </div>
-                    <div>
-                        <div class="flex items-center justify-center gap-1.5 mb-1">
-                            <span class="w-3 h-3 rounded-full bg-slate-600"></span>
-                            <span class="text-xs text-slate-400">Skipped</span>
-                        </div>
-                        <p id="skippedCount" class="text-xl font-bold text-slate-400">--</p>
+                    <div class="text-center">
+                        <p class="text-[10px] font-black uppercase text-slate-500 mb-2">Skipped</p>
+                        <p id="skippedCount" class="text-xl font-black text-slate-400">--</p>
                     </div>
                 </div>
-                <!-- Accuracy Badge -->
-                <div id="accuracyBadge" class="mt-6 px-4 py-2 rounded-full bg-primary-600/20 border border-primary-500/40 text-primary-400 text-sm font-semibold">
-                    --% Accuracy
+
+                <div id="accuracyBadge" class="mt-12 px-6 py-2 rounded-full bg-primary-500/10 border border-primary-500/20 text-primary-400 text-xs font-black uppercase tracking-widest">
+                    --% Precision
                 </div>
             </div>
 
-            <!-- RIGHT: Section Breakdown -->
-            <div class="bg-dark-800/60 border border-dark-700 rounded-2xl p-6">
-                <h3 class="text-base font-semibold text-slate-300 uppercase tracking-widest mb-6">Section Breakdown</h3>
-                <div id="sectionScoresContainer" class="space-y-5">
-                    <!-- Skeleton loader -->
-                    <div class="animate-pulse space-y-5">
-                        <div class="h-12 bg-dark-700 rounded-xl"></div>
-                        <div class="h-12 bg-dark-700 rounded-xl"></div>
-                        <div class="h-12 bg-dark-700 rounded-xl"></div>
-                        <div class="h-12 bg-dark-700 rounded-xl"></div>
-                        <div class="h-12 bg-dark-700 rounded-xl"></div>
+            <!-- Sectional Breakdown -->
+            <div class="lg:col-span-7 space-y-6">
+                <div class="glass rounded-[2.5rem] p-10">
+                    <h3 class="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-8">Performance by Topic</h3>
+                    <div id="sectionScoresContainer" class="space-y-6">
+                        <!-- Populated by JS -->
                     </div>
+                </div>
+
+                <!-- Export Action -->
+                <div class="glass rounded-[2rem] p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div>
+                        <h4 class="text-white font-black uppercase tracking-widest text-sm">Review your work</h4>
+                        <p class="text-slate-500 text-xs mt-1">Download the official answer key for this assessment.</p>
+                    </div>
+                    <button id="answerKeyBtn" onclick="downloadAnswerKey()" class="w-full md:w-auto px-8 py-4 btn-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                        Download Answer Key
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Actions -->
-        <div class="mt-7 md:mt-10 pt-5 md:pt-8 border-t border-dark-700 flex flex-col sm:flex-row justify-center items-center gap-3 md:gap-4">
-            <button id="answerKeyBtn" onclick="downloadAnswerKey()"
-               class="w-full sm:w-auto px-6 md:px-8 py-3 bg-dark-800 hover:bg-dark-700 border border-dark-600 text-white rounded-xl font-semibold shadow-lg transition-all flex items-center justify-center gap-3 text-sm md:text-base">
-                <svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Download Answer Key
-            </button>
-            <button onclick="logout()"
-                    class="w-full sm:w-auto px-6 md:px-8 py-3 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white rounded-xl font-semibold shadow-lg transition-all text-sm md:text-base">
-                Exit
-            </button>
-        </div>
     </div>
 
     <script src="js/api.js"></script>
     <script src="js/result.js"></script>
-    <script>
-        function logout() {
-            sessionStorage.clear();
-            localStorage.clear();
-            window.location.href = '/';
-        }
-    </script>
+    <script>lucide.createIcons();</script>
 </body>
 </html>

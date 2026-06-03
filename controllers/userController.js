@@ -1,125 +1,61 @@
-const User = require('../models/User');
+const User     = require('../models/User');
 const Question = require('../models/Question');
-const Exam = require('../models/Exam');
-const Student = require('../models/Student');
+const Exam     = require('../models/Exam');
 
-// @desc    Get student name by roll number
-// @route   GET /api/users/student/:rollNumber?collegeId=xxx&domain=xxx
-exports.getStudentByRoll = async (req, res) => {
-  try {
-    let roll = Number(req.params.rollNumber);
-    let collegeId = req.query.collegeId;
-    const domain = req.query.domain;
-
-    if (isNaN(roll)) return res.status(400).json({ message: 'Invalid roll number' });
-
-    if (!collegeId && domain) {
-      const college = await College.findOne({ domain });
-      if (!college) return res.status(404).json({ message: 'College domain not registered' });
-      collegeId = college._id;
-    }
-
-    if (!collegeId) return res.status(400).json({ message: 'College ID or Domain is required' });
-
-    // Negative roll number logic: absolute value represents the name
-    const absRoll = Math.abs(roll);
-    const student = await Student.findOne({ rollNumber: absRoll, collegeId });
-
-    if (!student) return res.status(404).json({ message: 'Student not found in this college' });
-    
-    // Return student name AND collegeId for the frontend
-    res.status(200).json({
-      name: student.name,
-      collegeId: student.collegeId
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Get all exams categorized by status
-// @route   GET /api/users/exams?collegeId=xxx
-exports.getExams = async (req, res) => {
-  try {
-    const { collegeId } = req.query;
-    if (!collegeId) return res.status(400).json({ message: 'College ID is required' });
-
-    const exams = await Exam.find({ collegeId }).sort({ startTime: -1 });
-    const now = new Date();
-
-    const result = {
-      past: [],
-      current: [],
-      upcoming: [],
-    };
-
-    exams.forEach(exam => {
-      if (exam.endTime && now > exam.endTime) {
-        result.past.push(exam);
-      } else if (exam.startTime && now < exam.startTime) {
-        result.upcoming.push(exam);
-      } else {
-        result.current.push(exam);
-      }
-    });
-
-    res.status(200).json(result);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+// Helper — derive email domain from email string
+function emailDomain(email) {
+  return '@' + email.toLowerCase().trim().split('@')[1];
+}
 
 // @desc    Register a student for a specific exam
 // @route   POST /api/users/register
 exports.registerUser = async (req, res) => {
   try {
-    const { rollNumber, email, examId } = req.body;
+    const { name, rollNumber, email, examId } = req.body;
 
-    if (!rollNumber || !email || !examId) {
-      return res.status(400).json({ message: 'Please provide roll number, email and examId' });
+    if (!name || !rollNumber || !email || !examId) {
+      return res.status(400).json({ message: 'Please provide name, roll number, email and examId' });
+    }
+
+    // --- Validate roll number range ---
+    const roll = Number(rollNumber);
+    if (!Number.isInteger(roll) || roll === 0 || Math.abs(roll) > 60) {
+      return res.status(400).json({ message: 'Roll number must be between 1 and 60' });
+    }
+
+    // --- Validate email domain ---
+    const emailLower  = email.toLowerCase().trim();
+    const domain      = emailDomain(emailLower);
+    const validDomains = ['@gectcr.ac.in', '@rit.ac.in'];
+    if (!validDomains.includes(domain)) {
+      return res.status(400).json({ message: 'Email must end with @gectcr.ac.in or @rit.ac.in' });
     }
 
     // --- Load exam ---
     const exam = await Exam.findById(examId);
     if (!exam) return res.status(404).json({ message: 'Exam not found' });
 
-    // --- Identify College by Email Domain ---
-    const emailLower = email.toLowerCase();
-    const emailDomain = '@' + emailLower.split('@')[1];
-    const college = await College.findOne({ domain: emailDomain });
-    if (!college) {
-      return res.status(400).json({ message: 'Your college is not registered on this platform.' });
-    }
-
-    // Check if exam belongs to this college
-    if (exam.collegeId.toString() !== college._id.toString()) {
+    // --- Check this exam is available for the student's college ---
+    if (!exam.targetColleges.includes(domain)) {
       return res.status(403).json({ message: 'This exam is not available for your college.' });
     }
 
-    // --- Fetch name from Student master list ---
-    const roll = Number(rollNumber);
-    const absRoll = Math.abs(roll);
-    const student = await Student.findOne({ rollNumber: absRoll, collegeId: college._id });
-    if (!student) {
-      return res.status(404).json({ message: 'Student roll number not found for your college.' });
-    }
-    const name = student.name;
-
     // --- Check for existing registration for THIS exam ---
-    const byRoll = await User.findOne({ rollNumber, examId });
+    const rollStr = rollNumber.toString();
+    const byRoll  = await User.findOne({ rollNumber: rollStr, examId });
     if (byRoll) {
       if (byRoll.isSubmitted) {
         return res.status(400).json({ message: 'This roll number has already submitted this exam' });
       }
       // Resume in-progress test
       return res.status(200).json({
-        _id: byRoll._id,
-        name: byRoll.name,
-        rollNumber: byRoll.rollNumber,
-        email: byRoll.email,
-        examId: byRoll.examId,
+        _id:         byRoll._id,
+        name:        byRoll.name,
+        rollNumber:  byRoll.rollNumber,
+        email:       byRoll.email,
+        examId:      byRoll.examId,
         isSubmitted: byRoll.isSubmitted,
-        message: 'Resuming test',
+        message:     'Resuming test',
       });
     }
 
@@ -132,14 +68,14 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'This email is already registered with a different roll number for this exam' });
     }
 
-    const user = await User.create({ name, rollNumber, email: emailLower, examId, collegeId: college._id });
+    const user = await User.create({ name, rollNumber: rollStr, email: emailLower, examId });
 
     res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      rollNumber: user.rollNumber,
-      email: user.email,
-      examId: user.examId,
+      _id:         user._id,
+      name:        user.name,
+      rollNumber:  user.rollNumber,
+      email:       user.email,
+      examId:      user.examId,
       isSubmitted: user.isSubmitted,
     });
 
@@ -167,7 +103,7 @@ exports.submitTest = async (req, res) => {
     }
 
     const user = await User.findOne({ rollNumber, examId });
-    if (!user) return res.status(404).json({ message: 'User not found for this exam' });
+    if (!user)          return res.status(404).json({ message: 'User not found for this exam' });
     if (user.isSubmitted) return res.status(400).json({ message: 'Test already submitted' });
 
     // Grade answers against this exam's questions only
@@ -180,13 +116,13 @@ exports.submitTest = async (req, res) => {
     });
     questions.forEach(q => {
       const qId = q._id.toString();
-      if (answers[qId] && answers[qId] === q.correctAnswer) {
+      if (answers[qId] !== undefined && String(answers[qId]) === String(q.correctAnswer)) {
         totalScore++;
         sectionScores[q.section]++;
       }
     });
 
-    user.answers      = answers;
+    user.answers       = answers;
     user.sectionScores = sectionScores;
     user.totalScore    = totalScore;
     user.isSubmitted   = true;
@@ -205,27 +141,54 @@ exports.getResult = async (req, res) => {
     const { examId, rollNumber } = req.params;
 
     const user = await User.findOne({ rollNumber, examId });
-    if (!user) return res.status(404).json({ message: 'User not found for this exam' });
+    if (!user)            return res.status(404).json({ message: 'User not found for this exam' });
     if (!user.isSubmitted) return res.status(400).json({ message: 'Test not yet submitted' });
 
-    const allQuestions = await Question.find({ examId }).select('section');
+    const allQuestions   = await Question.find({ examId }).select('section');
     const totalQuestions = allQuestions.length;
 
     const sectionTotals = {};
+    const qSectionMap   = {};
     allQuestions.forEach(q => {
       sectionTotals[q.section] = (sectionTotals[q.section] || 0) + 1;
+      qSectionMap[q._id.toString()] = q.section;
     });
 
-    const answeredCount    = user.answers.size;
+    const sectionAnswered = {};
+    Object.keys(sectionTotals).forEach(sec => sectionAnswered[sec] = 0);
+
+    const answersObj = user.answers instanceof Map
+      ? Object.fromEntries(user.answers)
+      : (user.answers || {});
+    Object.keys(answersObj).forEach(qId => {
+      const sec = qSectionMap[qId];
+      if (sec) sectionAnswered[sec]++;
+    });
+
+    const parsedSectionScores = user.sectionScores instanceof Map
+      ? Object.fromEntries(user.sectionScores)
+      : (user.sectionScores || {});
+
+    const sectionDetails = {};
+    Object.keys(sectionTotals).forEach(sec => {
+      const correct  = parsedSectionScores[sec] || 0;
+      const answered = sectionAnswered[sec]     || 0;
+      const wrong    = answered - correct;
+      const skipped  = sectionTotals[sec] - answered;
+      sectionDetails[sec] = { correct, wrong, skipped, total: sectionTotals[sec] };
+    });
+
+    const answeredCount    = Object.keys(answersObj).length;
     const correctCount     = user.totalScore;
     const wrongCount       = answeredCount - correctCount;
     const unattemptedCount = totalQuestions - answeredCount;
 
     res.status(200).json({
-      name: user.name,
-      rollNumber: user.rollNumber,
+      name:             user.name,
+      rollNumber:       user.rollNumber,
       examId,
-      sectionScores:    Object.fromEntries(user.sectionScores),
+      sectionScores:    parsedSectionScores,
+      sectionDetails,
       totalScore:       user.totalScore,
       totalQuestions,
       sectionTotals,
@@ -249,8 +212,8 @@ exports.getMyExams = async (req, res) => {
     }
 
     const query = rollNumber
-      ? { rollNumber, isSubmitted: true }
-      : { email: email.toLowerCase(), isSubmitted: true };
+      ? { rollNumber }
+      : { email: email.toLowerCase() };
 
     const records = await User.find(query).select('examId isSubmitted totalScore');
 

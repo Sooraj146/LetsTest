@@ -1,301 +1,246 @@
 /**
- * register.js — Exam dashboard logic
- *
- * Flow:
- *  1. Student fills details form → clicks "View Available Exams"
- *  2. Validate fields client-side
- *  3. Fetch /api/exams → filter by email domain → fetch /api/users/my-exams
- *  4. Render exam cards: Active / Upcoming / Completed / Not Available
- *  5. "Take Exam" → open confirm modal → POST /api/users/register → redirect to test.html
- *  6. "View Result" → redirect to result.html?examId=xxx
+ * register.js — Hardened Dashboard Logic
  */
 
 // ── State ────────────────────────────────────────────────────────────
-let studentInfo    = null;  // { name, rollNumber, email }
-let pendingExamId  = null;  // examId waiting for confirm-start
-let timers         = {};    // examId -> intervalId (for countdown cleanup)
+let studentInfo = JSON.parse(sessionStorage.getItem('studentInfo')) || null;
 
 // ── Elements ─────────────────────────────────────────────────────────
-const detailsPanel = document.getElementById('detailsPanel');
-const examPanel    = document.getElementById('examPanel');
-const detailsForm  = document.getElementById('detailsForm');
-const detailsError = document.getElementById('detailsError');
-const continueBtn  = document.getElementById('continueBtn');
+const loginPanel = document.getElementById('loginPanel');
+const dashboardPanel = document.getElementById('dashboardPanel');
+const detailsForm = document.getElementById('detailsForm');
+const loginError = document.getElementById('loginError');
+const continueBtn = document.getElementById('continueBtn');
 
-// ── On load: restore session if present ──────────────────────────────
+// ── Initialization ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    const saved = sessionStorage.getItem('studentInfo');
-    if (saved) {
-        studentInfo = JSON.parse(saved);
-        // Pre-fill form
-        document.getElementById('name').value       = studentInfo.name;
-        document.getElementById('rollNumber').value = studentInfo.rollNumber;
-        document.getElementById('email').value      = studentInfo.email;
-        showExamDashboard();
+    if (studentInfo) {
+        showDashboard();
+    } else {
+        loginPanel.classList.remove('hidden');
     }
 });
 
-// ── Details form submit ───────────────────────────────────────────────
-let nameFetchTimeout = null;
-async function fetchNameByRoll(rollNumber) {
-    const email = document.getElementById('email').value.trim();
-    if (!rollNumber || !email || !email.includes('@')) {
-        document.getElementById('name').value = '';
-        return;
-    }
-
-    clearTimeout(nameFetchTimeout);
-    nameFetchTimeout = setTimeout(async () => {
-        const nameInput = document.getElementById('name');
-        const loading = document.getElementById('nameLoading');
-        const errEl = document.getElementById('detailsError');
-
-        loading.classList.remove('hidden');
-        hideError(errEl);
-
-        try {
-            // First, get all colleges to find the one matching this domain
-            const collegesRes = await fetch('/api/admin/colleges'); // Note: This might need a public endpoint or we just try lookup
-            // Actually, let's just let the backend handle the college lookup by domain in a single call if possible
-            // But since I already changed getStudentByRoll to take collegeId, I need to find the college first.
-            // Let's assume there's a public /api/colleges/lookup?domain=...
-            
-            const domain = '@' + email.split('@')[1];
-            const student = await api.getStudentName(rollNumber, domain); // Update api helper to take domain
-            nameInput.value = student.name;
-            studentInfo = { ...studentInfo, collegeId: student.collegeId };
-        } catch (err) {
-            nameInput.value = '';
-            showError(errEl, err.message);
-        } finally {
-            loading.classList.add('hidden');
-        }
-    }, 500);
+function refreshIcons() {
+    if (window.lucide) lucide.createIcons();
 }
 
-// Also trigger name fetch when email changes
-document.getElementById('email')?.addEventListener('input', () => {
-    const roll = document.getElementById('rollNumber').value;
-    if (roll) fetchNameByRoll(roll);
-});
-
-detailsForm.addEventListener('submit', async (e) => {
+// ── Auth ─────────────────────────────────────────────────────────────
+detailsForm.onsubmit = async (e) => {
     e.preventDefault();
-    hideError(detailsError);
+    loginError.classList.add('hidden');
+    
+    const rollNumber = e.target.rollNumber.value.trim();
+    const email = e.target.email.value.trim();
 
-    const name       = document.getElementById('name').value.trim();
-    const rollNumber = document.getElementById('rollNumber').value.trim();
-    const email      = document.getElementById('email').value.trim();
-
-    if (!name || !email || !email.includes('@')) {
-        return showError(detailsError, 'Please enter roll number and valid college email.');
+    if (!email.includes('@')) {
+        return showError(loginError, 'Institutional email required.');
     }
 
-    const emailLower = email.toLowerCase();
-
-    // Loading state
     continueBtn.disabled = true;
-    continueBtn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Loading...`;
-
-    // studentInfo already has collegeId from fetchNameByRoll
-    studentInfo = { ...studentInfo, name, rollNumber, email: emailLower };
-    sessionStorage.setItem('studentInfo', JSON.stringify(studentInfo));
-
-    continueBtn.disabled = false;
-    continueBtn.innerHTML = `<span>View Exams</span><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`;
-
-    showExamDashboard();
-});
-
-// ── Show exam dashboard ───────────────────────────────────────────────
-async function showExamDashboard() {
-    // ... (rest of skeleton rendering)
+    const originalBtnText = continueBtn.innerHTML;
+    continueBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>LOADING...</span>';
+    refreshIcons();
 
     try {
-        const [allExams, myExams] = await Promise.all([
-            fetch(`/api/users/exams?collegeId=${studentInfo.collegeId}`).then(r => r.json()),
-            api.getMyExams({ rollNumber: studentInfo.rollNumber, email: studentInfo.email }),
-        ]);
+        const domain = '@' + email.split('@')[1];
+        const student = await api.getStudentName(rollNumber, domain);
         
-        // ... (rest of rendering logic)
-    } catch (err) {
-        // ...
-    }
-}
-
-        const renderItems = (items, containerId, sectionId) => {
-            const container = document.getElementById(containerId);
-            const section = document.getElementById(sectionId);
-            if (!items.length) {
-                section.classList.add('hidden');
-                container.innerHTML = '';
-                return;
-            }
-            section.classList.remove('hidden');
-            container.innerHTML = '';
-            items.forEach(item => container.appendChild(buildExamCard(item)));
+        studentInfo = {
+            name: student.name,
+            rollNumber: rollNumber,
+            email: email.toLowerCase(),
+            collegeId: student.collegeId,
+            collegeName: student.collegeName
         };
 
-        renderItems(active,   'listCurrent',  'sectionCurrent');
-        renderItems(upcoming, 'listUpcoming', 'sectionUpcoming');
-        renderItems(past,     'listPast',     'sectionPast');
-
-        if (!active.length && !upcoming.length && !past.length) {
-            document.getElementById('examEmpty').classList.remove('hidden');
-        }
-
+        sessionStorage.setItem('studentInfo', JSON.stringify(studentInfo));
+        await showDashboard();
+        notify(`Welcome back, ${studentInfo.name}`, 'success');
     } catch (err) {
-        document.getElementById('examEmpty').innerHTML = `<p class="text-red-400">Failed to load exams: ${err.message}</p>`;
-        document.getElementById('examEmpty').classList.remove('hidden');
+        showError(loginError, err.message);
+        continueBtn.disabled = false;
+        continueBtn.innerHTML = originalBtnText;
+        refreshIcons();
     }
+};
+
+function logout() {
+    sessionStorage.clear();
+    window.location.reload();
 }
 
-// ── Build exam card ───────────────────────────────────────────────────
-function buildExamCard({ exam, done, submission }) {
-    const now   = new Date();
-    const start = exam.startTime ? new Date(exam.startTime) : null;
-    const end   = exam.endTime   ? new Date(exam.endTime)   : null;
+// ── Dashboard ────────────────────────────────────────────────────────
+async function showDashboard() {
+    loginPanel.classList.add('hidden');
+    dashboardPanel.classList.remove('hidden');
 
-    const isPast     = end && end < now;
-    const isUpcoming = start && start > now && !isPast;
-    const isActive   = !isPast && !isUpcoming;
+    if (!studentInfo) return;
 
-    const card = document.createElement('div');
-    card.className = 'exam-card glass-panel rounded-2xl p-5';
+    // Direct DOM population
+    const nameEl = document.getElementById('studentName');
+    if (nameEl) nameEl.textContent = (studentInfo.name || 'STUDENT').toUpperCase();
 
-    // Status badge
-    let badgeHTML = '';
-    if (done) {
-        badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-emerald-400"></span>Completed</span>`;
-    } else if (isActive) {
-        badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-emerald-400 animate-pulse2"></span>Live Now</span>`;
-    } else if (isUpcoming) {
-        badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-yellow-400"></span>Upcoming</span>`;
-    } else {
-        badgeHTML = `<span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-slate-500/10 border border-slate-500/20 px-2.5 py-1 rounded-full"><span class="status-dot bg-slate-400"></span>Ended</span>`;
-    }
+    const affilEl = document.getElementById('studentAffiliation');
+    if (affilEl) affilEl.textContent = (studentInfo.collegeName || 'INSTITUTION').toUpperCase();
 
-    // Score if done
-    const scoreHTML = done && submission
-        ? `<span class="text-sm text-slate-400">Your score: <span class="text-white font-semibold">${submission.totalScore}</span></span>`
-        : '';
+    const rollEl = document.getElementById('displayRoll');
+    if (rollEl) rollEl.textContent = studentInfo.rollNumber || '---';
 
-    // Action button
-    let actionBtn = '';
-    if (done) {
-        actionBtn = `<a href="result.html?examId=${exam._id}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-xl transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            View Result
-        </a>`;
-    } else if (isActive) {
-        actionBtn = `<button onclick="openStartModal('${exam._id}', '${escHtml(exam.title)}')"
-            class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-primary-600 to-accent hover:from-primary-500 hover:to-purple-500 text-white text-sm font-semibold rounded-xl transition-all hover:-translate-y-0.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-            Take Exam
-        </button>`;
-    } else if (isUpcoming) {
-        actionBtn = `<div class="text-sm text-yellow-400 font-mono font-semibold" id="timer-${exam._id}">--:--:--</div>`;
-    }
+    await loadExams();
+}
 
-    // Timer caption
-    let timerCaption = '';
-    if (start && !isPast) {
-        const label = isActive ? 'Ends' : 'Starts';
-        const dt    = isActive ? end : start;
-        timerCaption = dt ? `<p class="text-xs text-slate-500 mt-1">${label}: ${dt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>` : '';
-    }
+async function loadExams() {
+    const listCurrent = document.getElementById('listCurrent');
+    const listUpcoming = document.getElementById('listUpcoming');
+    const listPast = document.getElementById('listPast');
+    const emptyState = document.getElementById('examEmpty');
 
-    card.innerHTML = `
-        <div class="flex items-start justify-between gap-3 mb-1">
-            <div class="flex-1 min-w-0">
-                ${badgeHTML}
-                <h2 class="text-base font-semibold text-white mt-2 leading-snug">${escHtml(exam.title)}</h2>
-                ${timerCaption}
-            </div>
-            <div class="flex flex-col items-end gap-2 flex-shrink-0">
-                ${actionBtn}
-                ${scoreHTML}
-            </div>
-        </div>`;
+    // Reset views
+    listCurrent.innerHTML = '';
+    listUpcoming.innerHTML = '';
+    listPast.innerHTML = '';
 
-    // Start countdown for upcoming exams
-    if (isUpcoming && start) {
-        const el = card.querySelector(`#timer-${exam._id}`);
-        if (el) {
-            const tick = () => {
-                const diff = start - new Date();
-                if (diff <= 0) { clearInterval(timers[exam._id]); showExamDashboard(); return; }
-                const h = Math.floor(diff / 3600000);
-                const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                el.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
-            };
-            tick();
-            timers[exam._id] = setInterval(tick, 1000);
+    try {
+        const [examsData, myResults] = await Promise.all([
+            api.getExams(studentInfo.collegeId),
+            api.getMyExams({ rollNumber: studentInfo.rollNumber, email: studentInfo.email })
+        ]);
+
+        const hasExams = (examsData.current?.length || 0) + (examsData.upcoming?.length || 0) + (examsData.past?.length || 0) > 0;
+        
+        if (!hasExams) {
+            emptyState.classList.remove('hidden');
+            return;
+        } else {
+            emptyState.classList.add('hidden');
         }
+
+        const activeExams = [];
+        const upcomingExams = [];
+        const pastExams = [...(examsData.past || [])];
+
+        // Logical sort: Submitted exams move to 'past'
+        (examsData.current || []).forEach(exam => {
+            if (myResults && myResults[exam._id]) {
+                pastExams.push(exam);
+            } else {
+                activeExams.push(exam);
+            }
+        });
+
+        (examsData.upcoming || []).forEach(exam => {
+            if (myResults && myResults[exam._id]) {
+                pastExams.push(exam);
+            } else {
+                upcomingExams.push(exam);
+            }
+        });
+
+        renderExamList(activeExams, listCurrent, myResults, 'current');
+        renderExamList(upcomingExams, listUpcoming, myResults, 'upcoming');
+        renderExamList(pastExams, listPast, myResults, 'past');
+
+        refreshIcons();
+    } catch (err) {
+        notify('Assessment sync failed. Please refresh.', 'error');
+        console.error('Sync Error:', err);
     }
-
-    return card;
 }
 
-// ── Start exam modal ──────────────────────────────────────────────────
-function openStartModal(examId, examTitle) {
-    pendingExamId = examId;
-    document.getElementById('modalExamTitle').textContent  = examTitle;
-    document.getElementById('confirmName').textContent     = studentInfo.name;
-    document.getElementById('confirmRoll').textContent     = studentInfo.rollNumber;
-    document.getElementById('confirmEmail').textContent    = studentInfo.email;
-    hideError(document.getElementById('modalError'));
-    document.getElementById('startModal').classList.remove('hidden');
+function renderExamList(exams, container, myExams, type) {
+    if (!exams || !exams.length) {
+        container.closest('section').classList.add('hidden');
+        return;
+    }
+    
+    container.closest('section').classList.remove('hidden');
+    container.innerHTML = exams.map(exam => {
+        const result = myExams ? myExams[exam._id] : null;
+        const isDone = !!result;
+        
+        let actionBtn = '';
+        let statusTag = '';
+
+        if (isDone) {
+            statusTag = '<span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-500/20">Completed</span>';
+            actionBtn = `<a href="result.html?examId=${exam._id}&rollNumber=${studentInfo.rollNumber}" class="w-full py-3 bg-white/5 hover:bg-emerald-500/10 text-emerald-400 text-xs font-black uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 border border-white/5">
+                <i data-lucide="award" class="w-4 h-4"></i> Analysis (${result.totalScore} pts)
+            </a>`;
+        } else if (type === 'current') {
+            statusTag = '<span class="px-2.5 py-1 bg-primary-500/10 text-primary-400 text-[9px] font-black uppercase tracking-widest rounded-lg border border-primary-500/20 animate-pulse">Active</span>';
+            actionBtn = `<button onclick="startExam(event, '${exam._id}')" class="w-full py-3 btn-primary text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-500/10">
+                <i data-lucide="play" class="w-4 h-4"></i> Start Assessment
+            </button>`;
+        } else if (type === 'upcoming') {
+            statusTag = '<span class="px-2.5 py-1 bg-slate-800 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-lg border border-white/5">Locked</span>';
+            const start = new Date(exam.startTime);
+            actionBtn = `<div class="text-[10px] text-slate-500 font-black uppercase tracking-widest flex items-center justify-center gap-2 py-3 bg-white/5 rounded-2xl border border-white/5">
+                <i data-lucide="lock" class="w-3.5 h-3.5"></i> ${start.toLocaleDateString()}
+            </div>`;
+        } else {
+            statusTag = '<span class="px-2.5 py-1 bg-red-500/10 text-red-500 text-[9px] font-black uppercase tracking-widest rounded-lg border border-red-500/20">Expired</span>';
+            actionBtn = `<div class="text-[10px] text-slate-600 font-black uppercase tracking-widest text-center py-3">Access Closed</div>`;
+        }
+
+        return `
+            <div class="glass-card group hover:border-primary-500/50 p-8 rounded-[2.5rem] flex flex-col justify-between border border-white/5 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                <div class="relative">
+                    <div class="mb-6 flex justify-between items-center">${statusTag} <i data-lucide="component" class="w-4 h-4 text-slate-800"></i></div>
+                    <h4 class="text-xl font-bold text-white mb-8 leading-tight tracking-tight group-hover:text-primary-400 transition-all uppercase">${esc(exam.title)}</h4>
+                </div>
+                <div class="relative z-10">${actionBtn}</div>
+            </div>
+        `;
+    }).join('');
 }
 
-function closeStartModal() {
-    document.getElementById('startModal').classList.add('hidden');
-    pendingExamId = null;
+// ── Exam Execution ───────────────────────────────────────────────────
+
+function notify(message, type = 'info') {
+    const container = document.getElementById('notificationContainer');
+    if (!container) return; // Fallback
+    const toast = document.createElement('div');
+    const colors = { success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400', error: 'bg-red-500/10 border-red-500/20 text-red-400', info: 'bg-primary-500/10 border-primary-500/20 text-primary-400' };
+    const icons = { success: 'check-circle', error: 'alert-circle', info: 'info' };
+    toast.className = `glass flex items-center gap-3 px-6 py-4 rounded-2xl border ${colors[type]} animate-slide-up pointer-events-auto shadow-2xl`;
+    toast.innerHTML = `<i data-lucide="${icons[type]}" class="w-5 h-5"></i><span class="text-sm font-bold uppercase tracking-tight">${message}</span>`;
+    container.appendChild(toast);
+    if (window.lucide) lucide.createIcons();
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-20px)';
+        toast.style.transition = 'all 0.5s ease-out';
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
 }
 
-async function confirmStart() {
-    if (!pendingExamId) return;
-
-    const btn       = document.getElementById('confirmStartBtn');
-    const modalErr  = document.getElementById('modalError');
-    hideError(modalErr);
-
+async function startExam(e, examId) {
+    const btn = e.currentTarget;
+    const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Starting...`;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> PREPARING...';
+    if (window.lucide) lucide.createIcons();
 
     try {
         const user = await api.register({
-            name:       studentInfo.name,
+            name: studentInfo.name,
             rollNumber: studentInfo.rollNumber,
-            email:      studentInfo.email,
-            examId:     pendingExamId,
+            email: studentInfo.email,
+            examId: examId
         });
 
-        // Save session with examId
-        sessionStorage.setItem('user', JSON.stringify({ ...user, examId: pendingExamId }));
+        sessionStorage.setItem('user', JSON.stringify({ ...user, examId: examId }));
         window.location.href = '/test.html';
-
     } catch (err) {
-        showError(modalErr, err.message);
+        notify(err.message, 'error');
         btn.disabled = false;
-        btn.innerHTML = `<span>Start Exam</span><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>`;
+        btn.innerHTML = originalText;
+        if (window.lucide) lucide.createIcons();
     }
 }
 
-// ── Switch user ───────────────────────────────────────────────────────
-function switchUser() {
-    sessionStorage.removeItem('studentInfo');
-    sessionStorage.removeItem('user');
-    studentInfo = null;
-    examPanel.classList.add('hidden');
-    detailsPanel.classList.remove('hidden');
-    Object.values(timers).forEach(clearInterval);
-    timers = {};
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────
-function showError(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
-function hideError(el)      { el.classList.add('hidden'); }
-function pad(n)             { return String(n).padStart(2, '0'); }
-function escHtml(str)       { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// ── Helpers ──────────────────────────────────────────────────────────
+function showError(el, msg) { el.textContent = msg.toUpperCase(); el.classList.remove('hidden'); }
+function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

@@ -3,164 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Exam Dashboard — Let's Test</title>
+    <title>Assessment Protocol — Let's Test</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155' },
-                        primary: { 500: '#3b82f6', 600: '#2563eb' },
-                        accent: '#8b5cf6'
+                        dark: { 950: '#020617', 900: '#0f172a', 800: '#1e293b', 700: '#334155', 600: '#475569' },
+                        primary: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' },
+                        accent: { 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed' }
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+                    animation: {
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                        'blob': 'blob 7s infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        slideUp: { from: { opacity: '0', transform: 'translateY(20px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+                        fadeIn: { from: { opacity: '0' }, to: { opacity: '1' } },
+                        blob: { '0%,100%': { transform: 'translate(0,0) scale(1)' }, '33%': { transform: 'translate(30px,-50px) scale(1.1)' }, '66%': { transform: 'translate(-20px,20px) scale(0.9)' } },
+                        glow: { from: { 'box-shadow': '0 0 5px #3b82f6, 0 0 10px #3b82f6' }, to: { 'box-shadow': '0 0 10px #3b82f6, 0 0 20px #3b82f6' } }
+                    }
                 }
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glass-card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%); transition: all 0.3s; }
+        .btn-primary:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .timer-glow { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5)); }
+    </style>
 </head>
-<body class="bg-dark-900 text-slate-200 font-sans h-[100dvh] flex overflow-hidden">
+<body class="bg-dark-950 text-slate-200 font-sans h-screen flex overflow-hidden selection:bg-primary-500/30">
 
-    <!-- ======= MOBILE OVERLAY (tap to close sidebar) ======= -->
-    <div id="sidebarOverlay"
-         class="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 hidden md:hidden"
-         onclick="closeSidebar()"></div>
+    <!-- Professional Background -->
+    <div class="fixed inset-0 pointer-events-none -z-10 bg-gradient-to-br from-dark-950 via-dark-900 to-dark-950"></div>
 
-    <!-- ======= SIDEBAR ======= -->
-    <!-- Mobile: fixed drawer sliding from left | Desktop: static left panel -->
-    <aside id="sidebar"
-           class="fixed md:relative left-0 top-0 z-40 w-72 md:w-64 h-full
-                  glass-panel border-r border-dark-700 flex flex-col
-                  -translate-x-full md:translate-x-0
-                  transition-transform duration-300 ease-in-out">
 
-        <!-- Sidebar Header -->
-        <div class="p-5 border-b border-dark-700 flex items-center justify-between">
-            <div>
-                <h1 class="text-xl font-bold text-white tracking-tight">Let's <span class="text-primary-500">Test</span></h1>
-                <p id="studentName" class="text-xs text-slate-400 mt-0.5 truncate max-w-[180px]">Student Name</p>
+    <!-- Notification Engine -->
+    <div id="notificationContainer" class="fixed top-6 left-1/2 -translate-x-1/2 z-[500] flex flex-col gap-3 w-full max-w-sm pointer-events-none"></div>
+
+    <!-- Generic Confirmation Dialog -->
+    <div id="confirmOverlay" class="hidden fixed inset-0 z-[400] flex items-center justify-center p-4 bg-dark-950/90 backdrop-blur-md animate-fade-in">
+        <div class="glass w-full max-w-sm p-10 rounded-[2.5rem] shadow-2xl border border-white/5 animate-slide-up text-center">
+            <div id="confirmIconContainer" class="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg bg-red-500/10 text-red-500 border border-red-500/20">
+                <i id="confirmIcon" data-lucide="alert-triangle" class="w-8 h-8"></i>
             </div>
-            <!-- Close button — mobile only -->
-            <button onclick="closeSidebar()"
-                    class="md:hidden p-1.5 rounded-lg hover:bg-dark-700 text-slate-400 hover:text-white transition-colors flex-shrink-0">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
+            <h3 id="confirmTitle" class="text-2xl font-black text-white mb-2 tracking-tight">Confirm Action</h3>
+            <p id="confirmMessage" class="text-slate-500 text-sm mb-10 leading-relaxed"></p>
+            <div class="flex gap-4">
+                <button id="confirmCancelBtn" class="flex-1 py-4 glass text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:text-white transition-all">Cancel</button>
+                <button id="confirmProceedBtn" class="flex-1 py-4 bg-red-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-red-500/20 transition-all hover:bg-red-600">Proceed</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Overlay (Mobile) -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-dark-950/80 backdrop-blur-sm z-30 hidden md:hidden transition-opacity duration-300" onclick="closeSidebar()"></div>
+
+    <!-- ======= SIDEBAR — CONTROL PANEL ======= -->
+    <aside id="sidebar" class="fixed md:relative left-0 top-0 z-40 w-80 h-full glass border-r border-white/5 flex flex-col -translate-x-full md:translate-x-0 transition-transform duration-500 ease-in-out">
+        
+        <!-- Workspace Identity -->
+        <div class="p-8 border-b border-white/5 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-primary-500/5 rounded-full -mr-8 -mt-8 blur-2xl"></div>
+            <div class="relative flex items-center justify-between mb-8">
+                <div>
+                    <h1 class="text-lg font-black text-white tracking-tighter leading-none">LET'S <span class="text-primary-500">TEST</span></h1>
+                    <p class="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] mt-1">Active Session</p>
+                </div>
+                <button onclick="closeSidebar()" class="md:hidden p-2 glass rounded-xl text-slate-500 hover:text-white transition-all">
+                    <i data-lucide="x-circle" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5 shadow-inner">
+                <div class="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/20">
+                    <i data-lucide="user" class="w-5 h-5"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p id="studentName" class="text-sm font-bold text-white truncate">Student Identity</p>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Verified Participant</p>
+                </div>
+            </div>
         </div>
 
-        <!-- Sections Nav -->
-        <div class="p-4 flex-1 overflow-y-auto custom-scrollbar">
-            <h2 class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-3 ml-1">Sections</h2>
-            <nav id="sectionNav" class="space-y-1"></nav>
+        <!-- Navigation Matrix -->
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-6">
+            <nav id="sectionNav" class="space-y-6">
+                <!-- Populated by JS -->
+            </nav>
         </div>
 
-        <!-- Progress + Submit -->
-        <div class="p-4 border-t border-dark-700">
-            <div class="mb-3">
-                <div class="text-xs text-slate-400 mb-1 flex justify-between">
-                    <span>Progress</span>
-                    <span id="progressText" class="font-medium text-slate-300">0/30</span>
+        <!-- System Commands -->
+        <div class="p-6 border-t border-white/5 bg-dark-950/20">
+            <div class="mb-6 px-2">
+                <div class="flex justify-between items-end mb-3">
+                    <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">Sync Progress</span>
+                    <span id="progressText" class="text-xs font-black text-primary-400">0/0</span>
                 </div>
-                <div class="w-full bg-dark-800 rounded-full h-1.5">
-                    <div id="progressBar" class="bg-gradient-to-r from-primary-500 to-accent h-1.5 rounded-full transition-all duration-500" style="width:0%"></div>
+                <div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/5">
+                    <div id="progressBar" class="h-full bg-gradient-to-r from-primary-600 to-accent-500 rounded-full transition-all duration-700 shadow-glow" style="width:0%"></div>
                 </div>
             </div>
-            <button id="finalSubmitBtn"
-                    class="w-full py-2.5 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/50 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Submit Test
+            <button id="finalSubmitBtn" class="w-full py-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-3">
+                <i data-lucide="check-square" class="w-4 h-4"></i>
+                Submit Assessment
             </button>
         </div>
     </aside>
 
-    <!-- ======= MAIN CONTENT ======= -->
-    <main class="flex-1 flex flex-col min-w-0 h-full relative bg-dark-900/50">
+    <!-- ======= MAIN THEATER ======= -->
+    <main class="flex-1 flex flex-col min-w-0 h-full relative">
 
-        <!-- Top Header -->
-        <header class="px-4 py-3 md:px-6 md:py-4 border-b border-dark-700 glass-panel flex flex-wrap items-center gap-3 flex-shrink-0">
-            <!-- Hamburger button — mobile only -->
-            <button onclick="openSidebar()"
-                    class="md:hidden p-2 rounded-lg hover:bg-dark-800 text-slate-400 hover:text-white transition-colors flex-shrink-0">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                </svg>
-            </button>
-            <div class="flex-1 min-w-0">
-                <h2 id="currentSectionTitle" class="text-base md:text-xl font-semibold text-white truncate">Loading...</h2>
-            </div>
-            
-            <div id="testTimerContainer" class="hidden" style="display:none">
-                <div class="text-xs md:text-sm px-3 py-1 bg-dark-800 rounded-full border border-primary-500/30 text-slate-300 flex items-center gap-1.5">
-                    <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span id="testTimerDisplay" class="font-mono font-bold text-primary-400 tracking-wider">--:--</span>
+        <!-- Global Status Bar -->
+        <header class="h-20 border-b border-white/5 px-8 flex items-center justify-between z-40 bg-dark-950/40 backdrop-blur-md">
+            <div class="flex items-center gap-4">
+                <button onclick="openSidebar()" class="md:hidden w-10 h-10 glass rounded-xl flex items-center justify-center text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+                <div class="h-10 w-1 bg-primary-600 rounded-full hidden lg:block mr-2 shadow-[0_0_10px_#3b82f6]"></div>
+                <div>
+                    <h2 id="currentSectionTitle" class="text-xl font-black text-white uppercase tracking-widest leading-none">Loading Section...</h2>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">Current Section</p>
                 </div>
             </div>
+            
+            <div class="flex items-center gap-6">
+                <!-- Advanced Timer -->
+                <div id="testTimerContainer" class="hidden relative group">
+                    <div class="absolute -inset-2 bg-primary-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                    <div class="relative px-6 py-2.5 bg-dark-800/80 border border-primary-500/30 rounded-full flex items-center gap-3 timer-glow">
+                        <i data-lucide="clock" class="w-4 h-4 text-primary-400 animate-pulse"></i>
+                        <span id="testTimerDisplay" class="font-mono text-lg font-black text-white tracking-[0.2em]">00:00</span>
+                    </div>
+                </div>
 
-            <div class="text-xs md:text-sm px-2.5 py-1 bg-dark-800 rounded-full border border-dark-700 text-slate-300 flex-shrink-0">
-                Q <span id="currentQuestionNum" class="font-bold text-white">1</span>/<span id="sectionTotalNum" class="font-bold text-white">?</span>
+                <div class="px-5 py-2.5 glass rounded-2xl flex items-center gap-3">
+                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Index</span>
+                    <div class="w-px h-4 bg-slate-800"></div>
+                    <div class="text-sm font-black text-white">
+                        <span id="currentQuestionNum" class="text-primary-400">1</span>
+                        <span class="text-slate-600 mx-1">/</span>
+                        <span id="sectionTotalNum">--</span>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <!-- Question Area -->
-        <div class="flex-1 overflow-y-auto custom-scrollbar">
-            <div class="max-w-3xl mx-auto w-full p-4 md:p-10 flex flex-col justify-center min-h-full">
-                <!-- Skeleton Loader -->
-                <div id="loader" class="animate-pulse space-y-6 hidden">
-                    <div class="h-5 bg-dark-700 rounded w-3/4"></div>
-                    <div class="space-y-3">
-                        <div class="h-14 bg-dark-800 rounded-xl"></div>
-                        <div class="h-14 bg-dark-800 rounded-xl"></div>
-                        <div class="h-14 bg-dark-800 rounded-xl"></div>
-                        <div class="h-14 bg-dark-800 rounded-xl"></div>
+        <!-- Question Viewport -->
+        <div class="flex-1 overflow-y-auto custom-scrollbar flex flex-col relative">
+            <div class="flex-1 max-w-4xl mx-auto w-full px-6 py-12 md:py-20 flex flex-col">
+                
+                <!-- System Loader -->
+                <div id="loader" class="animate-pulse space-y-10 hidden">
+                    <div class="h-12 bg-white/5 rounded-3xl w-3/4 shadow-inner"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="h-20 bg-white/5 rounded-[2rem] border border-white/5 shadow-inner"></div>
+                        <div class="h-20 bg-white/5 rounded-[2rem] border border-white/5 shadow-inner"></div>
+                        <div class="h-20 bg-white/5 rounded-[2rem] border border-white/5 shadow-inner"></div>
+                        <div class="h-20 bg-white/5 rounded-[2rem] border border-white/5 shadow-inner"></div>
                     </div>
                 </div>
-                <!-- Question Content -->
-                <div id="questionContainer" class="transition-opacity duration-300 opacity-0">
-                    <h3 id="questionText" class="text-base md:text-xl font-medium text-white mb-6 leading-relaxed">
-                        Loading question...
-                    </h3>
-                    <div id="optionsContainer" class="space-y-3"></div>
+
+                <!-- Interaction Space -->
+                <div id="questionContainer" class="transition-all duration-500 opacity-0 flex flex-col flex-1">
+                    <div class="relative mb-12">
+                        <h3 id="questionText" class="text-xl md:text-2xl font-bold text-white leading-relaxed relative z-10 tracking-tight">
+                            ---
+                        </h3>
+                    </div>
+                    
+                    <div id="optionsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-auto pb-12">
+                        <!-- Options injected here -->
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Bottom Navigation -->
-        <footer class="px-4 py-3 md:px-6 md:py-4 border-t border-dark-700 glass-panel flex justify-between items-center flex-shrink-0">
-            <button id="prevBtn"
-                    class="px-4 md:px-6 py-2.5 rounded-lg border border-dark-700 text-slate-300 hover:bg-dark-800 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        <!-- Tactical Navigation -->
+        <footer class="h-24 px-8 border-t border-white/5 glass flex items-center justify-between z-40 bg-dark-950/40 backdrop-blur-md">
+            <button id="prevBtn" class="flex items-center gap-3 px-8 py-4 glass rounded-2xl text-slate-400 hover:text-white transition-all text-xs font-black uppercase tracking-widest disabled:opacity-20 disabled:cursor-not-allowed group">
+                <i data-lucide="chevron-left" class="w-5 h-5 transition-transform group-hover:-translate-x-1"></i>
                 Prev
             </button>
-            <button id="nextBtn"
-                    class="px-4 md:px-6 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white font-medium shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-sm">
+            
+            <button id="reviewBtn" onclick="toggleReview()" class="flex items-center gap-3 px-6 py-4 glass rounded-2xl text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 border-purple-500/20 transition-all text-xs font-black uppercase tracking-widest group">
+                <i data-lucide="bookmark" class="w-5 h-5 transition-transform group-hover:scale-110"></i>
+                Review
+            </button>
+
+            <button id="nextBtn" class="flex items-center gap-3 px-8 py-4 btn-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-primary-500/20 group disabled:opacity-20">
                 Next
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                <i data-lucide="chevron-right" class="w-5 h-5 transition-transform group-hover:translate-x-1"></i>
             </button>
         </footer>
     </main>
-
-    <!-- Background blur -->
-    <div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div class="absolute -top-40 -right-40 w-96 h-96 bg-primary-900 rounded-full filter blur-[100px] opacity-20"></div>
-        <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-accent rounded-full filter blur-[100px] opacity-15"></div>
-    </div>
-
-    <!-- Submit Modal -->
-    <div id="submitModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center opacity-0 transition-opacity duration-300 p-4">
-        <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 md:p-8 max-w-md w-full shadow-2xl">
-            <h3 class="text-xl md:text-2xl font-bold text-white mb-3">Confirm Submission</h3>
-            <p class="text-slate-400 text-sm md:text-base mb-6">Are you sure you want to submit your test? You will not be able to change your answers after submission.</p>
-            <div class="flex justify-end gap-3">
-                <button id="cancelSubmitBtn" class="px-4 py-2 rounded-lg border border-dark-700 text-slate-300 hover:bg-dark-700 transition-colors text-sm">Cancel</button>
-                <button id="confirmSubmitBtn" class="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white shadow-lg transition-colors text-sm">Yes, Submit</button>
-            </div>
-        </div>
-    </div>
 
     <script src="js/api.js"></script>
     <script src="js/test.js"></script>

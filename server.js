@@ -1,18 +1,11 @@
-// Force Google public DNS for reliable SRV resolution on all platforms
-const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
-
-const express = require('express');
-const dotenv  = require('dotenv');
-const cors    = require('cors');
-const path    = require('path');
+const express   = require('express');
+const dotenv    = require('dotenv');
+const cors      = require('cors');
+const path      = require('path');
 const connectDB = require('./config/db');
-const { seedInitialAdmin } = require('./controllers/authController');
 
 dotenv.config();
-connectDB().then(() => {
-  seedInitialAdmin();
-});
+connectDB();
 
 const app = express();
 
