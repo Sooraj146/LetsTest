@@ -1,32 +1,33 @@
-// Central API helper — Hardened Version
+// Central API helper — Optimised (4 requests per student lifecycle)
 const api = {
-  // ── Exams ──────────────────────────────────────────────────────────
-  getExams: (collegeId) =>
-    fetch(`/api/users/exams?collegeId=${collegeId}`).then(async r => {
+
+  // ── Request 1: Login + Dashboard Data ────────────────────────────────
+  // Replaces: getStudentName + getExams + getMyExams (3 → 1)
+  login: ({ rollNumber, email }) =>
+    fetch('/api/users/login', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ rollNumber, email }),
+    }).then(async r => {
       const data = await r.json();
-      if (!r.ok) throw new Error(data.message || 'Failed to fetch assessments');
-      return data;
+      if (!r.ok) throw new Error(data.message || 'Login failed');
+      return data; // { student, exams: { current, upcoming, past } }
     }),
 
-  getExam: (examId) =>
-    fetch(`/api/exams/${examId}`).then(async r => {
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.message || 'Failed to load assessment details');
-      return data;
-    }),
-
-  // ── Student registration / submission ──────────────────────────────
-  register: ({ name, rollNumber, email, examId }) =>
+  // ── Request 2: Register + Exam Details + Questions ───────────────────
+  // Replaces: register + getExam + getQuestions (3 → 1)
+  register: ({ rollNumber, email, examId }) =>
     fetch('/api/users/register', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name, rollNumber, email, examId }),
+      body:    JSON.stringify({ rollNumber, email, examId }),
     }).then(async r => {
       const data = await r.json();
       if (!r.ok) throw new Error(data.message || 'Registration failed');
-      return data;
+      return data; // { ...user, examDetails, questions }
     }),
 
+  // ── Request 3: Submit ─────────────────────────────────────────────────
   submitTest: ({ rollNumber, examId, answers }) =>
     fetch('/api/users/submit', {
       method:  'POST',
@@ -38,6 +39,7 @@ const api = {
       return data;
     }),
 
+  // ── Request 4: Results ────────────────────────────────────────────────
   getResult: (examId, rollNumber) =>
     fetch(`/api/users/result/${examId}/${rollNumber}`).then(async r => {
       const data = await r.json();
@@ -45,24 +47,7 @@ const api = {
       return data;
     }),
 
-  getMyExams: ({ rollNumber, email }) =>
-    fetch('/api/users/my-exams', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ rollNumber, email }),
-    }).then(async r => {
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.message || 'Failed to sync your history');
-      return data;
-    }),
-
-  getStudentName: (rollNumber, domain) =>
-    fetch(`/api/users/student/${rollNumber}?domain=${encodeURIComponent(domain)}`).then(async r => {
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.message || 'Student identity not verified');
-      return data;
-    }),
-
+  // ── Optional: Analysis (user-triggered only) ─────────────────────────
   getAggregatedAnalysis: (rollNumber, collegeId) =>
     fetch(`/api/users/analysis/${rollNumber}?collegeId=${collegeId}`).then(async r => {
       const data = await r.json();
@@ -70,14 +55,7 @@ const api = {
       return data;
     }),
 
-  // ── Questions ────────────────────────────────────────────────────────
-  getQuestions: (examId) =>
-    fetch(`/api/questions?examId=${examId}`).then(async r => {
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.message || 'Failed to sync question modules');
-      return data;
-    }),
-
+  // ── Optional: Answer Key download (user-triggered only) ──────────────
   getAnswerKey: (examId) =>
     fetch(`/api/questions/answer-key?examId=${examId}`).then(async r => {
       const data = await r.json();

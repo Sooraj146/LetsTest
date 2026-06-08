@@ -1,31 +1,6 @@
 const Exam = require('../models/Exam');
 const College = require('../models/College');
 
-// @desc  List all exams (public)
-// @route GET /api/exams?collegeId=xxx
-exports.listExams = async (req, res) => {
-  try {
-    const query = {};
-    if (req.query.collegeId) query.collegeId = req.query.collegeId;
-    const exams = await Exam.find(query).sort({ createdAt: -1 });
-    res.status(200).json(exams);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc  Get a single exam by ID (public — used for timer on test page)
-// @route GET /api/exams/:id
-exports.getExam = async (req, res) => {
-  try {
-    const exam = await Exam.findById(req.params.id);
-    if (!exam) return res.status(404).json({ message: 'Exam not found' });
-    res.status(200).json(exam);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
 // Helper — get collegeId from admin or body
 function getCollegeId(req) {
   if (req.admin.role === 'main') {

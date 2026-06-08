@@ -1,22 +1,22 @@
 const express = require('express');
 const {
+  login,
   registerUser,
   submitTest,
   getResult,
-  getMyExams,
-  getStudentByRoll,
-  getExams,
   getAggregatedAnalysis,
 } = require('../controllers/userController');
 
 const router = express.Router();
 
-router.get('/student/:rollNumber',    getStudentByRoll);
-router.get('/exams',                 getExams);
-router.post('/register',              registerUser);
-router.post('/submit',                submitTest);
+// Merged endpoints (replaces student lookup + exams + my-exams)
+router.post('/login',                login);
+
+// Merged register (returns examDetails + questions in one response)
+router.post('/register',             registerUser);
+
+router.post('/submit',               submitTest);
 router.get('/result/:examId/:rollNumber', getResult);
-router.post('/my-exams',              getMyExams);
-router.get('/analysis/:rollNumber',   getAggregatedAnalysis);
+router.get('/analysis/:rollNumber',  getAggregatedAnalysis);
 
 module.exports = router;

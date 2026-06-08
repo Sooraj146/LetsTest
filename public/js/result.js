@@ -42,8 +42,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentExamId   = params.get('examId');
     studentRoll     = params.get('rollNumber');
 
-    const aggregatedMode = params.get('aggregated') === 'true';
-
     if (!currentExamId || !studentRoll) {
         const user = JSON.parse(sessionStorage.getItem('user') || 'null');
         const studentInfo = JSON.parse(sessionStorage.getItem('studentInfo') || 'null');
@@ -222,54 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (mobileContainer) mobileContainer.innerHTML = noSecText;
             }
 
-        } else {
-            // Hide the hero result sections if no specific exam is requested
-            const lgMainGrid = document.querySelector('.lg\\:col-span-5');
-            const lgBreakdown = document.querySelector('.lg\\:col-span-7');
-            if (lgMainGrid) lgMainGrid.style.display = 'none';
-            if (lgBreakdown) lgBreakdown.style.display = 'none';
-        }
-
-        // Always attempt to fetch aggregated analysis if we have student credentials
-        const studentInfo = JSON.parse(sessionStorage.getItem('studentInfo') || '{}');
-        const roll = studentRoll || studentInfo.rollNumber;
-        const cid  = studentInfo.collegeId;
-
-        if (roll && cid) {
-            try {
-                const aggData = await api.getAggregatedAnalysis(roll, cid);
-
-                // If we are in aggregated mode (clicked "Analysis" on dashboard), show the panel
-                if (aggregatedMode || !currentExamId) {
-                    const aggPanel = document.getElementById('overallAggregatedPanel');
-                    if (aggPanel) aggPanel.style.display = 'block';
-
-                    const grid = document.getElementById('aggregatedMetricsGrid');
-                    if (grid) {
-                        grid.innerHTML = `
-                            <div class="glass rounded-[2rem] p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-blue-500 opacity-20"></div>
-                                <h4 class="text-slate-500 font-black uppercase tracking-widest text-xs mb-4">Cumulative Score</h4>
-                                <p class="text-6xl font-black text-white leading-none mb-2">${aggData.metrics.gpa}%</p>
-                            </div>
-                            <div class="glass rounded-[2rem] p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500 opacity-20"></div>
-                                <h4 class="text-slate-500 font-black uppercase tracking-widest text-xs mb-4">Participation</h4>
-                                <p class="text-6xl font-black text-white leading-none mb-2">${aggData.metrics.participation}%</p>
-                                <p class="text-xs text-slate-600 font-bold uppercase tracking-wider mt-2">${aggData.metrics.testsTaken} / ${aggData.metrics.testsAssigned} ASSESSMENTS</p>
-                            </div>
-                            <div class="glass rounded-[2rem] p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-20"></div>
-                                <h4 class="text-slate-500 font-black uppercase tracking-widest text-xs mb-4">Precision Index</h4>
-                                <p class="text-6xl font-black text-white leading-none mb-2">${aggData.metrics.precision}%</p>
-                            </div>
-                        `;
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to load aggregated profile:', err);
-            }
-        }
+        } // end if (currentExamId)
 
     } catch (err) {
         console.error(err);
@@ -283,9 +234,9 @@ async function downloadAnswerKey() {
     const mobileBtn = document.getElementById('mobileAnswerKeyBtn');
     const orig = btn ? btn.innerHTML : '';
     const mobileOrig = mobileBtn ? mobileBtn.innerHTML : '';
-    
+
     const loadingHtml = `<svg class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Generating...`;
-    
+
     if (btn) { btn.disabled = true; btn.innerHTML = loadingHtml; }
     if (mobileBtn) { mobileBtn.disabled = true; mobileBtn.innerHTML = loadingHtml; }
 
@@ -294,41 +245,48 @@ async function downloadAnswerKey() {
         if (!resp.ok) throw new Error('Answer key not available.');
         const data = await resp.json();
 
+        // Resolve exam title from sessionStorage (set when the exam was started)
+        const examDetailsRaw = sessionStorage.getItem('examDetails');
+        const examTitle = examDetailsRaw ? (JSON.parse(examDetailsRaw).title || 'Assessment') : 'Assessment';
+
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
 
-        // Professional Dark Slate Header Band
+        // ── Header Band ───────────────────────────────────────────────
         doc.setFillColor(15, 23, 42); // slate-900
-        doc.rect(0, 0, 210, 38, 'F');
-        
-        // Brand Bottom Cyan Rule
-        doc.setFillColor(0, 242, 255); // neon cyan
-        doc.rect(0, 36, 210, 2, 'F');
+        doc.rect(0, 0, 210, 42, 'F');
 
-        doc.setTextColor(255, 255, 255); // white text
-        doc.setFontSize(20); 
+        // Cyan accent rule
+        doc.setFillColor(0, 242, 255);
+        doc.rect(0, 40, 210, 2, 'F');
+
+        // Title
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
-        doc.text('OFFICIAL ANSWER KEY', 14, 20);
+        doc.text('OFFICIAL ANSWER KEY', 14, 16);
 
-        doc.setFontSize(9.5); 
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(148, 163, 184); // slate-400
-        doc.text(`Assessment ID: ${currentExamId}`, 14, 28); 
-        doc.text(`Candidate Roll: ${studentRoll.toString().toUpperCase()}`, 14, 33);
+        // Sections list in header
+        const sectionLabel = data.sections.length > 0
+            ? `SECTIONS: ${data.sections.join('  ·  ')}`
+            : 'SECTIONS: —';
+        doc.setFontSize(10);
+        doc.setTextColor(0, 200, 210); // cyan-ish
+        doc.text(sectionLabel, 14, 26);
 
-        let y = 48;
+        let y = 52;
 
         data.sections.forEach(section => {
             const questions = data.questions[section];
             if (y > 255) { doc.addPage(); y = 20; }
 
-            // Clean Section Header (Slate-900 text + Underline Rule)
-            doc.setFontSize(12); 
-            doc.setTextColor(15, 23, 42); // slate-900
-            doc.setFont('helvetica', 'bold'); 
+            // Section Header
+            doc.setFontSize(12);
+            doc.setTextColor(15, 23, 42);
+            doc.setFont('helvetica', 'bold');
             doc.text(`SECTION: ${section.toUpperCase()}`, 14, y + 6);
-            
-            doc.setDrawColor(226, 232, 240); // slate-200
+
+            doc.setDrawColor(226, 232, 240);
             doc.setLineWidth(0.5);
             doc.line(14, y + 8, 196, y + 8);
             y += 16;
@@ -337,47 +295,44 @@ async function downloadAnswerKey() {
                 if (y > 270) { doc.addPage(); y = 20; }
 
                 // Question Text
-                doc.setFontSize(10); 
-                doc.setTextColor(30, 41, 59); // slate-800
+                doc.setFontSize(10);
+                doc.setTextColor(30, 41, 59);
                 doc.setFont('helvetica', 'bold');
-                const qText = doc.splitTextToSize(`Q${i + 1}. ${q.questionText}`, 174); 
-                doc.text(qText, 14, y); 
+                const qText = doc.splitTextToSize(`Q${i + 1}. ${q.questionText}`, 174);
+                doc.text(qText, 14, y);
                 y += (qText.length * 5) + 3;
 
-                // Options List
+                // Options
                 q.options.forEach((opt, idx) => {
                     const isCorrect = String(idx) === String(q.correctAnswer);
-                    const optLabel = String.fromCharCode(65 + idx);
-
-                    const optText = doc.splitTextToSize(`${optLabel}. ${opt}`, 166);
+                    const optLabel  = String.fromCharCode(65 + idx);
+                    const optText   = doc.splitTextToSize(`${optLabel}. ${opt}`, 166);
                     const boxHeight = (optText.length * 5) + 4;
 
                     if (y + boxHeight > 282) { doc.addPage(); y = 20; }
 
                     if (isCorrect) {
-                        // Soft green highlight box for the correct option
-                        doc.setFillColor(240, 253, 244); // light green background
+                        doc.setFillColor(240, 253, 244);
                         doc.rect(18, y, 174, boxHeight, 'F');
-                        
-                        // Solid Green Left Accent Bar
-                        doc.setFillColor(34, 197, 94); // solid green
+                        doc.setFillColor(34, 197, 94);
                         doc.rect(18, y, 2, boxHeight, 'F');
-                        
-                        doc.setTextColor(21, 128, 61); // forest green-700
+                        doc.setTextColor(21, 128, 61);
                         doc.setFont('helvetica', 'bold');
                     } else {
-                        doc.setTextColor(71, 85, 105); // slate-600
+                        doc.setTextColor(71, 85, 105);
                         doc.setFont('helvetica', 'normal');
                     }
 
-                    doc.text(optText, 24, y + 5); 
+                    doc.text(optText, 24, y + 5);
                     y += boxHeight + 1.5;
                 });
                 y += 5;
             });
         });
 
-        doc.save(`AnswerKey_Roll_${studentRoll}.pdf`);
+        // Sanitise title for filename (remove special chars)
+        const safeTitle = examTitle.replace(/[^a-zA-Z0-9\s\-_]/g, '').trim();
+        doc.save(`Answer Key - ${safeTitle}.pdf`);
         notify('Answer key downloaded successfully', 'success');
     } catch (err) {
         notify(err.message, 'error');
@@ -387,3 +342,4 @@ async function downloadAnswerKey() {
         if (window.lucide) lucide.createIcons();
     }
 }
+

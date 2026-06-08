@@ -97,15 +97,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         loader.style.display = '';
         questionContainer.style.opacity = '0';
 
-        const [rawQuestions, examDetails] = await Promise.all([
-            api.getQuestions(examId),
-            api.getExam(examId).catch(() => null)
-        ]);
+        // Data pre-loaded during register step — no extra API calls needed
+        const examDetailsStr  = sessionStorage.getItem('examDetails');
+        const examQuestionsStr = sessionStorage.getItem('examQuestions');
+
+        const examDetails  = examDetailsStr  ? JSON.parse(examDetailsStr)  : null;
+        const rawQuestions = examQuestionsStr ? JSON.parse(examQuestionsStr) : null;
 
         loader.style.display = 'none';
-        
+
         // Populate Topbar
-        const topbarExamName = document.getElementById('topbarExamName');
+        const topbarExamName    = document.getElementById('topbarExamName');
         const topbarStudentName = document.getElementById('topbarStudentName');
         if (topbarExamName) {
             topbarExamName.textContent = examDetails ? examDetails.title : 'Assessment Session';

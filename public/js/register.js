@@ -66,24 +66,24 @@ detailsForm.onsubmit = async (e) => {
     btnIcon.outerHTML = `<svg id="continueBtnIcon" class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
 
     try {
-        const domain  = '@' + email.split('@')[1];
-        const student = await api.getStudentName(rollNumber, domain);
+        // REQUEST 1: Single merged login call — returns student info + all exams
+        const loginData = await api.login({ rollNumber, email });
 
         studentInfo = {
-            name:        student.name,
-            rollNumber:  rollNumber,
+            name:        loginData.student.name,
+            rollNumber:  loginData.student.rollNumber,
             email:       email.toLowerCase(),
-            collegeId:   student.collegeId,
-            collegeName: student.collegeName
+            collegeId:   loginData.student.collegeId,
+            collegeName: loginData.student.collegeName
         };
 
         sessionStorage.setItem('studentInfo', JSON.stringify(studentInfo));
-        await showDashboard();
+        // Pass pre-fetched exam data directly — no more separate API calls
+        await showDashboard(loginData.exams);
     } catch (err) {
         showError(err.message);
         continueBtn.disabled = false;
-        document.getElementById('continueBtnText').textContent = 'Login to Dashboard';
-        // re-render arrow icon
+        document.getElementById('continueBtnText').textContent = 'Access Dashboard';
         const iconEl = document.getElementById('continueBtnIcon');
         if (iconEl) iconEl.outerHTML = `<svg id="continueBtnIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
     }
@@ -100,7 +100,9 @@ function logout() {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────
-async function showDashboard() {
+// preloadedExams: passed in after login to avoid re-fetching.
+// When session-restoring (page refresh), we re-fetch via api.login().
+async function showDashboard(preloadedExams = null) {
     loginPanel.style.display = 'none';
     dashboardPanel.style.display = '';
 
@@ -122,10 +124,12 @@ async function showDashboard() {
         avatarEl.textContent = parts.map(p => p[0]).join('').toUpperCase().slice(0, 2);
     }
 
-    await loadExams();
+    await loadExams(preloadedExams);
 }
 
-async function loadExams() {
+// preloadedExams: already-fetched data from login response (avoids extra API calls).
+// If null (session restore / dashboard refresh), fetches via api.login() instead.
+async function loadExams(preloadedExams = null) {
     const listCurrent  = document.getElementById('listCurrent');
     const listUpcoming = document.getElementById('listUpcoming');
     const listPast     = document.getElementById('listPast');
@@ -138,10 +142,18 @@ async function loadExams() {
     if (listExpired) listExpired.innerHTML = '';
 
     try {
-        const [examsData, myResults] = await Promise.all([
-            api.getExams(studentInfo.collegeId),
-            api.getMyExams({ rollNumber: studentInfo.rollNumber, email: studentInfo.email })
-        ]);
+        let examsData;
+        if (preloadedExams) {
+            // Data already available from the login response — no extra request
+            examsData = preloadedExams;
+        } else {
+            // Session restore (page refresh): re-run merged login to get fresh data
+            const loginData = await api.login({
+                rollNumber: studentInfo.rollNumber,
+                email:      studentInfo.email
+            });
+            examsData = loginData.exams;
+        }
 
         const hasExams = (examsData.current?.length || 0)
                        + (examsData.upcoming?.length || 0)
@@ -153,40 +165,38 @@ async function loadExams() {
         }
         emptyState.style.display = 'none';
 
+        // Each exam now carries isCompleted + result from the server
         const activeExams   = [];
         const upcomingExams = [];
-        const pastExams     = [...(examsData.past || [])];
-        const expiredExams  = [];
+        const completedExams = [];
+        const missedExams    = [];
 
         (examsData.current || []).forEach(exam => {
-            if (myResults && myResults[exam._id]) pastExams.push(exam);
+            if (exam.isCompleted) completedExams.push(exam);
             else activeExams.push(exam);
         });
 
         (examsData.upcoming || []).forEach(exam => {
-            if (myResults && myResults[exam._id]) pastExams.push(exam);
+            if (exam.isCompleted) completedExams.push(exam);
             else upcomingExams.push(exam);
         });
 
-        // Sort past: completed first, expired last
-        pastExams.sort((a, b) => {
-            const ad = !!(myResults && myResults[a._id]);
-            const bd = !!(myResults && myResults[b._id]);
-            if (ad && !bd) return -1;
-            if (!ad && bd) return 1;
-            return 0;
+        (examsData.past || []).forEach(exam => {
+            if (exam.isCompleted) completedExams.push(exam);
+            else missedExams.push(exam);
         });
 
-        // Separate expired (no result) from past
-        const completedExams = pastExams.filter(e => myResults && myResults[e._id]);
-        const missedExams    = pastExams.filter(e => !(myResults && myResults[e._id]));
+        // Build a results map compatible with existing render functions
+        const myResults = {};
+        [...completedExams].forEach(exam => {
+            if (exam.result) myResults[exam._id] = exam.result;
+        });
 
         renderActiveTests(activeExams, listCurrent, myResults);
         renderUpcomingTests(upcomingExams, listUpcoming);
         renderHistoryList(completedExams, listPast, myResults);
         if (listExpired) renderExpiredList(missedExams, listExpired);
 
-        // Show/hide sections
         toggle('sectionCurrent',  activeExams.length > 0);
         toggle('sectionUpcoming', upcomingExams.length > 0);
         toggle('sectionPast',     completedExams.length > 0);
@@ -324,6 +334,8 @@ function renderExpiredList(exams, container) {
 }
 
 // ── Exam Start ─────────────────────────────────────────────────────────
+// REQUEST 2: Single merged register call — returns user + examDetails + questions.
+// Stores everything in sessionStorage so test.html needs 0 extra API calls.
 async function startExam(e, examId) {
     const btn = e.currentTarget;
     const orig = btn.innerHTML;
@@ -331,13 +343,26 @@ async function startExam(e, examId) {
     btn.innerHTML = `<svg class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> PREPARING...`;
 
     try {
-        const user = await api.register({
-            name:       studentInfo.name,
+        const payload = await api.register({
             rollNumber: studentInfo.rollNumber,
             email:      studentInfo.email,
             examId:     examId
         });
-        sessionStorage.setItem('user', JSON.stringify({ ...user, examId }));
+
+        // Store user session (without the bulk data)
+        sessionStorage.setItem('user', JSON.stringify({
+            _id:        payload._id,
+            name:       payload.name,
+            rollNumber: payload.rollNumber,
+            email:      payload.email,
+            examId:     payload.examId,
+            isSubmitted: payload.isSubmitted,
+        }));
+
+        // Store exam details and questions separately for test.html
+        sessionStorage.setItem('examDetails', JSON.stringify(payload.examDetails));
+        sessionStorage.setItem('examQuestions', JSON.stringify(payload.questions));
+
         window.location.href = '/test.html';
     } catch (err) {
         notify(err.message, 'error');
