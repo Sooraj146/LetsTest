@@ -20,9 +20,19 @@ exports.getStudents = async (req, res) => {
     
     const students = await Student.find({ collegeId }).sort({ rollNumber: 1 });
     
-    // Aggregate stats for each student
+    // Fetch active exam IDs to ignore deleted exams' submissions
+    const activeExams = await Exam.find({ collegeId }).select('_id');
+    const activeExamIds = activeExams.map(e => e._id);
+    
+    // Aggregate stats for each student matching only active exams
     const stats = await User.aggregate([
-      { $match: { collegeId: require('mongoose').Types.ObjectId.createFromHexString(collegeId.toString()), isSubmitted: true } },
+      { 
+        $match: { 
+          collegeId: require('mongoose').Types.ObjectId.createFromHexString(collegeId.toString()), 
+          isSubmitted: true,
+          examId: { $in: activeExamIds }
+        } 
+      },
       { 
         $group: { 
           _id: "$rollNumber", 

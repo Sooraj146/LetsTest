@@ -23,6 +23,7 @@ const {
   createExam,
   updateExam,
   deleteExam,
+  getExams,
 } = require('../controllers/examController');
 const {
   login,
@@ -64,9 +65,11 @@ router.delete('/students',     deleteAllStudents);
 router.get('/students/:id/analysis', getStudentAnalysis);
 
 // ── Exam management ────────────────────────────────────────────────
+router.get('/exams',       getExams);
 router.post('/exams',      createExam);
 router.put('/exams/:id',   updateExam);
 router.delete('/exams/:id', deleteExam);
+
 
 // ── Leaderboard + analytics (require ?examId=xxx) ──────────────────
 router.get('/leaderboard', getLeaderboard);

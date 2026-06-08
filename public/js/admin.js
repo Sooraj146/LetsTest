@@ -306,7 +306,7 @@ async function loadExamsGrid() {
     const grid = document.getElementById('examGrid');
     grid.innerHTML = '<div class="col-span-full py-20 text-center text-slate-500"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4"></div><p class="uppercase font-black text-[10px] tracking-widest">Optimizing assessments...</p></div>';
     try {
-        const res = await fetch(`/api/exams?collegeId=${selectedCollegeId}`);
+        const res = await fetch(`/api/admin/exams?collegeId=${selectedCollegeId}`, { headers: getAuthHeaders() });
         const exams = await res.json();
         window.allExams = exams;
         updateStatsBar('Total Assessments', exams.length);

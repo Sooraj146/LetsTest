@@ -80,8 +80,33 @@ exports.deleteExam = async (req, res) => {
   try {
     const exam = await Exam.findByIdAndDelete(req.params.id);
     if (!exam) return res.status(404).json({ message: 'Exam not found' });
+
+    // Cascading deletes for database cleanup
+    const Question = require('../models/Question');
+    const User = require('../models/User');
+    await Promise.all([
+      Question.deleteMany({ examId: req.params.id }),
+      User.deleteMany({ examId: req.params.id })
+    ]);
+
     res.status(200).json({ message: 'Exam deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc  Get all exams for a college (admin)
+// @route GET /api/admin/exams
+exports.getExams = async (req, res) => {
+  try {
+    const collegeId = getCollegeId(req);
+    if (!collegeId) {
+      return res.status(400).json({ message: 'collegeId is required for main admin' });
+    }
+    const exams = await Exam.find({ collegeId }).sort({ startTime: -1 });
+    res.status(200).json(exams);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
