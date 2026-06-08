@@ -330,7 +330,12 @@ async function loadExamsGrid() {
 
 function openExamModal(id = null) {
     const exam = id ? window.allExams.find(e => e._id === id) : { title: '', startTime: '', endTime: '', collegeId: selectedCollegeId };
-    const fmt = (d) => d ? new Date(d).toISOString().slice(0, 16) : '';
+    const fmt = (d) => {
+        if (!d) return '';
+        const dateObj = new Date(d);
+        const offset = dateObj.getTimezoneOffset() * 60000;
+        return new Date(dateObj.getTime() - offset).toISOString().slice(0, 16);
+    };
     setModalTitle(id ? 'Refine Assessment' : 'Launch New Assessment');
     let collegeSection = '';
     if (currentAdmin.role === 'main') {
@@ -341,7 +346,16 @@ function openExamModal(id = null) {
 
 async function saveExam(e, id) {
     e.preventDefault();
-    const body = { title: e.target.title.value.toUpperCase(), startTime: e.target.startTime.value || null, endTime: e.target.endTime.value || null };
+    const startTimeLocal = e.target.startTime.value;
+    const endTimeLocal = e.target.endTime.value;
+    const startTimeUTC = startTimeLocal ? new Date(startTimeLocal).toISOString() : null;
+    const endTimeUTC = endTimeLocal ? new Date(endTimeLocal).toISOString() : null;
+
+    const body = { 
+        title: e.target.title.value.toUpperCase(), 
+        startTime: startTimeUTC, 
+        endTime: endTimeUTC 
+    };
     if (currentAdmin.role === 'main') { body.collegeId = e.target.collegeId.value; if (!body.collegeId) return notify('Target college is required', 'error'); }
     else { body.collegeId = currentAdmin.college?._id; }
     try {
