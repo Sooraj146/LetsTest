@@ -63,7 +63,14 @@ const api = {
       return data;
     }),
 
-  // ── Questions ──────────────────────────────────────────────────────
+  getAggregatedAnalysis: (rollNumber, collegeId) =>
+    fetch(`/api/users/analysis/${rollNumber}?collegeId=${collegeId}`).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || 'Failed to fetch aggregated analysis');
+      return data;
+    }),
+
+  // ── Questions ────────────────────────────────────────────────────────
   getQuestions: (examId) =>
     fetch(`/api/questions?examId=${examId}`).then(async r => {
       const data = await r.json();

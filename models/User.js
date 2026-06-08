@@ -3,40 +3,46 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   // Which exam this registration is for
   examId: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'Exam',
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Exam',
     required: true,
-    index:    true,
+    index: true,
   },
   name: {
-    type:     String,
+    type: String,
     required: true,
   },
   rollNumber: {
-    type:     String,
+    type: String,
     required: true,
   },
   email: {
-    type:     String,
+    type: String,
     required: true,
   },
   answers: {
-    type:    Map,
-    of:      String, // Question ID -> selected option
+    type: Map,
+    of: String, // Question ID -> selected option
     default: {},
   },
   sectionScores: {
-    type:    Map,
-    of:      Number,
+    type: Map,
+    of: Number,
     default: {},
   },
   totalScore: {
-    type:    Number,
+    type: Number,
     default: 0,
   },
   isSubmitted: {
-    type:    Boolean,
+    type: Boolean,
     default: false,
+  },
+  collegeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'College',
+    required: true,
+    index: true,
   },
 }, { timestamps: true });
 

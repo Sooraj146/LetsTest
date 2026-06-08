@@ -2,23 +2,29 @@ const mongoose = require('mongoose');
 
 const examSchema = new mongoose.Schema({
   title: {
-    type:     String,
+    type: String,
     required: true,
-    trim:     true,
+    trim: true,
   },
   // Which college email domains can see and take this exam
   // e.g. ['@gectcr.ac.in'] or ['@rit.ac.in'] or both
   targetColleges: {
-    type:    [String],
+    type: [String],
     default: [],
   },
   startTime: {
-    type:    Date,
+    type: Date,
     default: null,
   },
   endTime: {
-    type:    Date,
+    type: Date,
     default: null,
+  },
+  collegeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'College',
+    required: true,
+    index: true,
   },
 }, { timestamps: true });
 

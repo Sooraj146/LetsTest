@@ -105,8 +105,8 @@ function confirmAction(title, message, type = 'danger') {
 loginForm.onsubmit = async (e) => {
     e.preventDefault();
     loginError.classList.add('hidden');
-    const username = e.target.username.value;
-    const password = e.target.password.value;
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
     try {
         const res = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
         const data = await res.json();
@@ -402,7 +402,7 @@ async function loadStudentsList() {
                     <td class="px-8 py-6 text-center"><span class="text-sm font-black text-white">${s.totalMarks || 0}</span></td>
                     <td class="px-8 py-6 text-center"><span class="text-xs font-bold text-primary-400 bg-primary-500/5 px-2 py-1 rounded-md border border-primary-500/10">${avgScore}</span></td>
                     <td class="px-8 py-6 text-center"><div class="inline-flex items-center justify-center w-8 h-8 rounded-full border font-black text-xs ${rankClass}">${rank}</div></td>
-                    <td class="px-8 py-6 text-right"><div class="flex justify-end gap-2"><button onclick="openStudentModal('${s._id}')" class="p-2.5 glass rounded-xl text-slate-400 hover:text-white hover:bg-primary-500/20 hover:border-primary-500/40 transition-all" title="Edit Profile"><i data-lucide="edit-3" class="w-4 h-4"></i></button><button onclick="deleteStudent('${s._id}')" class="p-2 glass rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all" title="Delete Student"><i data-lucide="user-minus" class="w-4 h-4"></i></button></div></td>
+                    <td class="px-8 py-6 text-right"><div class="flex justify-end gap-2"><button onclick="openStudentAnalysis('${s._id}')" class="p-2.5 glass rounded-xl text-primary-400 hover:text-white hover:bg-primary-500/20 hover:border-primary-500/40 transition-all" title="View Analysis"><i data-lucide="microscope" class="w-4 h-4"></i></button><button onclick="openStudentModal('${s._id}')" class="p-2.5 glass rounded-xl text-slate-400 hover:text-white hover:bg-primary-500/20 hover:border-primary-500/40 transition-all" title="Edit Profile"><i data-lucide="edit-3" class="w-4 h-4"></i></button><button onclick="deleteStudent('${s._id}')" class="p-2 glass rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all" title="Delete Student"><i data-lucide="user-minus" class="w-4 h-4"></i></button></div></td>
                 </tr>
             `;
         }).join('');
@@ -512,6 +512,8 @@ function loadSubTabContent(id) {
     }
 }
 
+let leaderboardSections = []; // Store globally for exports
+
 async function loadLeaderboard() {
     const list = document.getElementById('leaderboardList');
     list.innerHTML = '<tr><td colspan="4" class="px-8 py-10 text-center text-slate-500 uppercase font-black tracking-widest text-xs">Aggregating results...</td></tr>';
@@ -520,12 +522,34 @@ async function loadLeaderboard() {
         const { leaderboard, totalQuestions } = await res.json();
         leaderboardData = leaderboard; window.totalQuestions = totalQuestions;
         updateStatsBar('Ranked Results', leaderboard.length);
+        
         if (leaderboard.length === 0) { list.innerHTML = '<tr><td colspan="4" class="px-8 py-20 text-center text-slate-500 uppercase font-black tracking-widest text-xs opacity-50">No submissions recorded yet.</td></tr>'; return; }
+        
+        // Find all unique sections from submissions
+        const uniqueSections = new Set();
+        leaderboard.forEach(u => {
+            if (u.sectionScores) Object.keys(u.sectionScores).forEach(sec => uniqueSections.add(sec));
+        });
+        leaderboardSections = Array.from(uniqueSections).sort();
+
+        // Update Table Headers
+        const thead = document.getElementById('leaderboardThead');
+        let thHtml = `<tr>
+            <th class="px-8 py-5">Rank</th>
+            <th class="px-8 py-5">Student Identity</th>
+            <th class="px-8 py-5 text-center">Total Mark</th>`;
+        leaderboardSections.forEach(sec => {
+            thHtml += `<th class="px-8 py-5 text-center truncate max-w-[100px]" title="${sec}">${sec}</th>`;
+        });
+        thHtml += `<th class="px-8 py-5 text-right">Submission Time</th></tr>`;
+        thead.innerHTML = thHtml;
+
         list.innerHTML = leaderboard.map(u => `
             <tr class="group hover:bg-white/[0.02] transition-all border-b border-white/[0.02]">
                 <td class="px-8 py-6"><div class="w-8 h-8 rounded-full flex items-center justify-center font-black ${u.rank === 1 ? 'bg-yellow-500/20 text-yellow-500 shadow-[0_0_12px_rgba(234,179,8,0.2)]' : 'bg-dark-800 text-slate-500'} border border-white/5 font-black text-xs">${u.rank}</div></td>
                 <td class="px-8 py-6"><div class="text-white font-bold uppercase tracking-tight">${u.name}</div><div class="text-slate-500 text-[10px] uppercase font-bold tracking-[0.2em] mt-1 opacity-50">${u.rollNumber} • ${u.email}</div></td>
                 <td class="px-8 py-6 text-center"><span class="text-lg font-black text-primary-400">${u.totalScore}</span><span class="text-slate-600 font-bold text-xs ml-1">/${totalQuestions}</span></td>
+                ${leaderboardSections.map(sec => `<td class="px-8 py-6 text-center text-sm font-bold text-white">${u.sectionScores[sec] || 0}</td>`).join('')}
                 <td class="px-8 py-6 text-right text-slate-400 font-mono text-xs">${new Date(u.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toUpperCase()}</td>
             </tr>
         `).join('');
@@ -656,9 +680,22 @@ async function deleteQuestion(id) {
 function getSortedResults() { return [...leaderboardData].sort((a, b) => a.rollNumber - b.rollNumber); }
 
 function downloadCSV() {
-    const data = getSortedResults(); if (data.length === 0) return notify('No data to export', 'info');
-    const headers = ['Rank', 'Name', 'Roll Number', 'Email', 'Score', 'Total Questions', 'Submitted At'];
-    const rows = data.map(u => [u.rank, u.name, u.rollNumber, u.email, u.totalScore, window.totalQuestions, new Date(u.submittedAt).toLocaleString().toUpperCase()]);
+    const data = getSortedResults();
+    if (data.length === 0) return notify('No data to export', 'info');
+
+    // Build dynamic headers
+    const baseHeaders = ['Rank', 'Name', 'Roll Number', 'Email'];
+    const sectionHeaders = leaderboardSections.map(sec => sec.toUpperCase());
+    const endHeaders = ['Total Score', 'Total Questions', 'Submitted At'];
+    const headers = [...baseHeaders, ...sectionHeaders, ...endHeaders];
+
+    const rows = data.map(u => {
+        const baseData = [u.rank, u.name, u.rollNumber, u.email];
+        const sectionData = leaderboardSections.map(sec => u.sectionScores[sec] || 0);
+        const endData = [u.totalScore, window.totalQuestions, new Date(u.submittedAt).toLocaleString().toUpperCase()];
+        return [...baseData, ...sectionData, ...endData];
+    });
+
     let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
     const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Results_${document.getElementById('detailExamTitle').textContent}_RollSorted.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); notify('CSV Export complete', 'success');
 }
@@ -670,7 +707,7 @@ function downloadPDF() {
     if (data.length === 0) return notify('No data to export', 'info');
 
     const title = document.getElementById('detailExamTitle').textContent;
-    
+
     // Header
     doc.setFillColor(15, 23, 42); // Dark blue header
     doc.rect(0, 0, 210, 40, 'F');
@@ -678,26 +715,31 @@ function downloadPDF() {
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
     doc.text('EXAMINATION RESULTS', 14, 20);
-    
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(title, 14, 30);
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 35);
 
-    const rows = data.map(u => [
-        u.rollNumber, 
-        u.name.toUpperCase(), 
-        u.email, 
-        `${u.totalScore}/${window.totalQuestions}`, 
-        new Date(u.submittedAt).toLocaleTimeString().toUpperCase()
-    ]);
-    
+    // Dynamic headers for PDF
+    const baseHead = ['Roll No.', 'Candidate Name'];
+    const sectionHead = leaderboardSections.map(sec => sec.substring(0, 8)); // truncate for PDF space
+    const endHead = ['Total Score', 'Timestamp'];
+    const headRow = [...baseHead, ...sectionHead, ...endHead];
+
+    const rows = data.map(u => {
+        const baseData = [u.rollNumber, u.name.toUpperCase()];
+        const sectionData = leaderboardSections.map(sec => u.sectionScores[sec] || 0);
+        const endData = [`${u.totalScore}/${window.totalQuestions}`, new Date(u.submittedAt).toLocaleTimeString().toUpperCase()];
+        return [...baseData, ...sectionData, ...endData];
+    });
+
     doc.autoTable({
         startY: 45,
-        head: [['Roll No.', 'Candidate Name', 'Registered Email', 'Score', 'Timestamp']],
+        head: [headRow],
         body: rows,
         theme: 'grid',
-        styles: { font: 'helvetica', fontSize: 9, cellPadding: 4 },
+        styles: { font: 'helvetica', fontSize: 8, cellPadding: 3 },
         headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         margin: { top: 45 }
@@ -729,3 +771,159 @@ async function clearUsers() {
 function setModalTitle(text) { document.getElementById('modalTitle').textContent = text.toUpperCase(); }
 function showModal(content) { document.getElementById('modalBody').innerHTML = content; document.getElementById('modalOverlay').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
 function closeModal() { document.getElementById('modalOverlay').classList.add('hidden'); document.body.style.overflow = ''; }
+
+function openSidebar() { document.getElementById('sidebar').classList.remove('-translate-x-full'); document.getElementById('sidebarOverlay').classList.remove('hidden'); }
+function closeSidebar() { document.getElementById('sidebar').classList.add('-translate-x-full'); document.getElementById('sidebarOverlay').classList.add('hidden'); }
+
+// ── Student Analysis Modal ───────────────────────────────────────────
+let saRadarChartInst = null;
+let saTrendChartInst = null;
+
+async function openStudentAnalysis(studentId) {
+    document.getElementById('studentAnalysisModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    
+    // Reset state
+    document.getElementById('saContent').classList.add('opacity-0');
+    document.getElementById('saContent').classList.add('hidden');
+    document.getElementById('saLoader').classList.remove('hidden');
+    document.getElementById('saNoRadarData').classList.add('hidden');
+    document.getElementById('saNoTrendData').classList.add('hidden');
+
+    try {
+        const res = await fetch(`/api/admin/students/${studentId}/analysis`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch analysis');
+        const data = await res.json();
+        
+        // Populate Header
+        document.getElementById('saName').textContent = data.student.name;
+        document.getElementById('saRoll').textContent = data.student.rollNumber;
+        document.getElementById('saCollege').textContent = data.student.college;
+
+        // Populate Top Metrics
+        document.getElementById('saGPA').textContent = `${data.metrics.gpa}%`;
+        document.getElementById('saPrecision').textContent = `${data.metrics.precision}%`;
+        document.getElementById('saParticipation').textContent = `${data.metrics.participation}%`;
+        document.getElementById('saTestsTaken').textContent = `${data.metrics.testsTaken}/${data.metrics.testsAssigned}`;
+        
+        // Find Mastery
+        let bestSec = 'N/A';
+        let bestScore = -1;
+        Object.entries(data.radarData).forEach(([sec, score]) => {
+            if (score > bestScore) { bestScore = score; bestSec = sec; }
+        });
+        document.getElementById('saMastery').textContent = bestScore > 0 ? bestSec : 'N/A';
+
+        // Render Charts
+        renderSARadarChart(data.radarData);
+        renderSATrendChart(data.trendData);
+
+        // Show Content
+        setTimeout(() => {
+            document.getElementById('saLoader').classList.add('hidden');
+            const content = document.getElementById('saContent');
+            content.classList.remove('hidden');
+            setTimeout(() => content.classList.remove('opacity-0'), 50);
+        }, 500);
+
+    } catch (err) {
+        notify(err.message, 'error');
+        closeStudentAnalysis();
+    }
+}
+
+function closeStudentAnalysis() {
+    document.getElementById('studentAnalysisModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function renderSARadarChart(radarData) {
+    const ctx = document.getElementById('saRadarChart').getContext('2d');
+    if (saRadarChartInst) saRadarChartInst.destroy();
+
+    const labels = Object.keys(radarData);
+    const data = Object.values(radarData);
+
+    if (labels.length === 0) {
+        document.getElementById('saNoRadarData').classList.remove('hidden');
+        return;
+    }
+
+    saRadarChartInst = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: labels.map(l => l.length > 15 ? l.substring(0, 15) + '...' : l),
+            datasets: [{
+                label: 'Mastery Level (%)',
+                data: data,
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                borderColor: 'rgba(59, 130, 246, 1)',
+                pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    pointLabels: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 10, family: 'Inter', weight: 'bold' } },
+                    ticks: { display: false, min: 0, max: 100 }
+                }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+function renderSATrendChart(trendData) {
+    const ctx = document.getElementById('saTrendChart').getContext('2d');
+    if (saTrendChartInst) saTrendChartInst.destroy();
+
+    if (trendData.length === 0) {
+        document.getElementById('saNoTrendData').classList.remove('hidden');
+        return;
+    }
+
+    const labels = trendData.map(t => new Date(t.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'}));
+    const data = trendData.map(t => t.scorePct);
+
+    saTrendChartInst = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Exam Score (%)',
+                data: data,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#10b981',
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10, family: 'Inter', weight: 'bold' } } },
+                y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10, family: 'Inter', weight: 'bold' } } }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: { 
+                    callbacks: { title: (context) => trendData[context[0].dataIndex].examName },
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)', titleFont: { size: 12, weight: 'bold' }, padding: 12, cornerRadius: 8 
+                }
+            }
+        }
+    });
+}
