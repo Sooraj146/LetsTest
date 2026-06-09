@@ -629,14 +629,14 @@ async function loadAnalytics() {
 
 function renderDonut(labels, successRates, overallSuccess) {
     const ctx = document.getElementById('sectionDonutChart').getContext('2d'); if (sectionDonutChart) sectionDonutChart.destroy();
-    const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4'];
+    const colors = ['#ff3d71', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4'];
     
     // Set default overall percentage
     const percentEl = document.getElementById('donutPercent');
     percentEl.textContent = overallSuccess + '%';
 
     sectionDonutChart = new Chart(ctx, {
-        type: 'doughnut', data: { labels: labels, datasets: [{ data: labels.map(() => 1), backgroundColor: colors.slice(0, labels.length), borderWidth: 4, borderColor: '#0f172a', hoverOffset: 30, hoverBorderWidth: 0 }] },
+        type: 'doughnut', data: { labels: labels, datasets: [{ data: labels.map(() => 1), backgroundColor: colors.slice(0, labels.length), borderWidth: 4, borderColor: '#0a0e14', hoverOffset: 30, hoverBorderWidth: 0 }] },
         options: {
             cutout: '80%', layout: { padding: 30 }, plugins: { legend: { display: false } }, animation: { animateScale: true, animateRotate: true },
             onHover: (e, elements) => { if (elements.length > 0) { percentEl.textContent = successRates[elements[0].index] + '%'; } },
@@ -754,7 +754,7 @@ function downloadPDF() {
         body: rows,
         theme: 'grid',
         styles: { font: 'helvetica', fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+        headStyles: { fillColor: [255, 61, 113], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         margin: { top: 45 }
     });
@@ -870,12 +870,12 @@ function renderSARadarChart(radarData) {
             datasets: [{
                 label: 'Mastery Level (%)',
                 data: data,
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                borderColor: 'rgba(59, 130, 246, 1)',
-                pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                backgroundColor: 'rgba(255, 61, 113, 0.2)',
+                borderColor: 'rgba(255, 61, 113, 1)',
+                pointBackgroundColor: 'rgba(255, 61, 113, 1)',
                 pointBorderColor: '#fff',
                 pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
+                pointHoverBorderColor: 'rgba(255, 61, 113, 1)',
                 borderWidth: 2,
             }]
         },
