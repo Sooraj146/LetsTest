@@ -39,12 +39,89 @@
 
         #sidebarOverlay.open { display: block; }
 
+        /* Desktop topbar layout classes */
+        .topbar-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .topbar-row-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .topbar-row-right {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            margin-left: auto;
+        }
+
         @media (max-width: 768px) {
             .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
             .sidebar.open { transform: translateX(0); box-shadow: 8px 0 40px rgba(0,0,0,0.5); }
             .exam-main { margin-left: 0 !important; }
-            .exam-topbar { padding: 0 16px; }
-            .exam-question-area { padding: 24px 16px; }
+            .exam-topbar { padding: 0 16px; height: auto !important; min-height: 76px; }
+            .exam-question-area { padding: 20px 12px; }
+
+            /* Topbar Mobile Overrides */
+            .topbar-wrapper {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 10px 0;
+                gap: 8px;
+            }
+            .topbar-row-left {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+            }
+            .topbar-row-right {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+                margin-left: 0;
+                border-top: 1px solid rgba(255, 255, 255, 0.05);
+                padding-top: 6px;
+                gap: 12px;
+            }
+            #topbarExamName {
+                font-size: 1.15rem !important;
+                font-weight: 800 !important;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: calc(100vw - 80px);
+            }
+            #topbarStudentName {
+                font-size: 0.95rem !important;
+                font-weight: 700 !important;
+            }
+            .topbar-student-info {
+                text-align: left !important;
+            }
+            .topbar-session-label {
+                display: none !important;
+            }
+            .timer-display {
+                font-size: 0.85rem !important;
+                padding: 6px 12px !important;
+            }
+            .timer-label {
+                display: none !important;
+            }
+
+            /* Question Font size & Container Padding Mobile Overrides */
+            #questionContainer {
+                padding: 24px 20px !important;
+            }
+            #questionText {
+                font-size: 1.25rem !important;
+                margin-bottom: 24px !important;
+            }
         }
     </style>
 </head>
@@ -129,24 +206,23 @@
 
         <!-- Top bar -->
         <div class="exam-topbar">
-            <!-- Mobile menu -->
-            <button onclick="openSidebar()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px;margin-right:8px;display:none;" id="menuBtn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
-                </svg>
-            </button>
-
-            <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
-                <!-- Left: Exam Name -->
-                <div style="display:flex;align-items:center;gap:16px;">
+            <div class="topbar-wrapper">
+                <!-- Left: Exam Name & Mobile menu button -->
+                <div class="topbar-row-left">
+                    <!-- Mobile menu -->
+                    <button onclick="openSidebar()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px;margin-right:8px;display:none;" id="menuBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
                     <div id="topbarExamName" style="font-size: 1.55rem; font-weight: 900; color: #fff; letter-spacing: -0.02em; text-shadow: 0 0 15px rgba(255,255,255,0.15);">Loading Assessment...</div>
                 </div>
 
                 <!-- Right: Student Name & Timer -->
-                <div style="display:flex;align-items:center;gap:32px;margin-left:auto;">
-                    <div style="text-align: right; display: flex; flex-direction: column;">
+                <div class="topbar-row-right">
+                    <div class="topbar-student-info" style="text-align: right; display: flex; flex-direction: column;">
                         <span id="topbarStudentName" style="font-size: 1.15rem; font-weight: 800; color: var(--cyan); text-shadow: 0 0 15px rgba(0,242,255,0.25);">Candidate</span>
-                        <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">Assessment Session</span>
+                        <span class="topbar-session-label" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">Assessment Session</span>
                     </div>
 
                     <!-- Timer -->
@@ -156,7 +232,7 @@
                                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                             </svg>
                             <span id="testTimerDisplay">00:00</span>
-                            <span style="font-size:0.72rem;font-weight:600;color:inherit;opacity:0.8;">Remaining</span>
+                            <span class="timer-label" style="font-size:0.72rem;font-weight:600;color:inherit;opacity:0.8;">Remaining</span>
                         </div>
                     </div>
                 </div>
