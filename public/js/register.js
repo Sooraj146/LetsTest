@@ -484,10 +484,12 @@ function renderSARadarChart(radarData) {
             maintainAspectRatio: false,
             scales: {
                 r: {
+                    min: 0,
+                    max: 100,
                     angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
                     grid: { color: 'rgba(255, 255, 255, 0.08)' },
                     pointLabels: { color: 'rgba(255, 255, 255, 0.6)', font: { size: 10, family: 'Outfit', weight: 'bold' } },
-                    ticks: { display: false, min: 0, max: 100 }
+                    ticks: { display: false }
                 }
             },
             plugins: { legend: { display: false } }
