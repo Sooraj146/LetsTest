@@ -58,35 +58,85 @@
             margin-left: auto;
         }
 
+        /* Navigation action buttons layout (Desktop/Flow) */
+        .exam-nav-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            gap: 16px;
+            width: 100%;
+        }
+        .exam-nav-row {
+            display: flex;
+            gap: 16px;
+            flex: 2;
+            justify-content: flex-end;
+        }
+        .exam-nav-btn {
+            flex: 1;
+            max-width: 240px;
+            height: 52px;
+            font-size: 1rem !important;
+            font-weight: 700 !important;
+            justify-content: center;
+            align-items: center;
+            padding: 0 24px !important;
+            display: inline-flex;
+        }
+        .exam-nav-review-btn {
+            flex: 1;
+            max-width: 240px;
+            height: 52px;
+            font-size: 1rem !important;
+            font-weight: 700 !important;
+            justify-content: center;
+            align-items: center;
+            padding: 0 24px !important;
+            display: inline-flex;
+            color: var(--yellow) !important;
+            border: 1px solid rgba(255, 214, 10, 0.25) !important;
+            background: rgba(255, 214, 10, 0.05) !important;
+        }
+        .exam-nav-review-btn:hover {
+            background: rgba(255, 214, 10, 0.15) !important;
+            box-shadow: 0 0 20px rgba(255, 214, 10, 0.2) !important;
+        }
+
         @media (max-width: 768px) {
             .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
             .sidebar.open { transform: translateX(0); box-shadow: 8px 0 40px rgba(0,0,0,0.5); }
-            .exam-main { margin-left: 0 !important; }
-            .exam-topbar { padding: 0 16px; height: auto !important; min-height: 76px; }
-            .exam-question-area { padding: 20px 12px; }
+            .exam-layout { height: 100dvh; overflow: hidden; }
+            .exam-main { margin-left: 0 !important; height: 100dvh; overflow: hidden; }
+            .exam-topbar { padding: 0 16px; height: 64px !important; min-height: 64px !important; }
+            .exam-question-area { padding: 20px 12px 24px !important; }
 
-            /* Topbar Mobile Overrides */
+            /* Topbar Mobile Overrides — Single Row Layout */
             .topbar-wrapper {
-                flex-direction: column;
-                align-items: stretch;
-                padding: 10px 0;
-                gap: 8px;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                gap: 0 !important;
+                padding: 0 !important;
             }
             .topbar-row-left {
                 display: flex;
                 align-items: center;
-                justify-content: space-between;
-                width: 100%;
+                gap: 8px;
+                flex: 1;
+                min-width: 0;
             }
             .topbar-row-right {
                 display: flex;
                 align-items: center;
-                justify-content: space-between;
-                width: 100%;
-                margin-left: 0;
-                border-top: 1px solid rgba(255, 255, 255, 0.05);
-                padding-top: 6px;
-                gap: 12px;
+                width: auto !important;
+                margin-left: 12px !important;
+                border-top: none !important;
+                padding-top: 0 !important;
+                gap: 0 !important;
+                flex-shrink: 0;
             }
             #topbarExamName {
                 font-size: 1.15rem !important;
@@ -94,16 +144,9 @@
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
-                max-width: calc(100vw - 80px);
-            }
-            #topbarStudentName {
-                font-size: 0.95rem !important;
-                font-weight: 700 !important;
+                max-width: 100%;
             }
             .topbar-student-info {
-                text-align: left !important;
-            }
-            .topbar-session-label {
                 display: none !important;
             }
             .timer-display {
@@ -116,13 +159,58 @@
 
             /* Question Font size & Container Padding Mobile Overrides */
             #questionContainer {
-                padding: 24px 20px !important;
+                padding: 24px 20px 180px !important; /* Added 180px bottom padding inside the card */
+                margin-bottom: 0 !important;
+                border-radius: var(--radius-lg) !important;
             }
             #questionText {
-                font-size: 1.25rem !important;
+                font-size: 1.2rem !important;
                 margin-bottom: 24px !important;
             }
+            
+            /* Pinned Sticky Action Bar on Mobile */
+            .exam-nav-container {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 12px !important;
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                margin-top: 0 !important;
+                padding: 16px 20px calc(16px + env(safe-area-inset-bottom)) !important;
+                background: rgba(10, 14, 20, 0.9) !important;
+                backdrop-filter: blur(20px) !important;
+                -webkit-backdrop-filter: blur(20px) !important;
+                border-top: 1px solid rgba(0, 242, 255, 0.15) !important;
+                z-index: 45 !important;
+                box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5) !important;
+                border-bottom: none !important;
+            }
+            
+            #reviewBtn {
+                grid-column: span 2 !important;
+                grid-row: 1 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+            }
+            
+            #prevBtn {
+                grid-row: 2 !important;
+                grid-column: 1 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            #nextBtn {
+                grid-row: 2 !important;
+                grid-column: 2 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
         }
+
     </style>
 </head>
 <body>
@@ -161,6 +249,7 @@
         <div class="sidebar-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
             <div>
                 <div class="sidebar-brand">Let's Test</div>
+                <div id="sidebarStudentName" style="font-size:0.82rem;color:var(--text-secondary);font-weight:600;margin-top:4px;text-transform:uppercase;letter-spacing:0.05em;">Candidate</div>
             </div>
             <!-- Sidebar Timer (shown on laptop only) -->
             <div id="sidebarTimerContainer" style="display:none;margin-left:auto;margin-right:10px;">
@@ -260,11 +349,11 @@
                 <div style="position: absolute; top: -50px; left: -50px; width: 150px; height: 150px; background: var(--cyan-dark); filter: blur(60px); border-radius: 50%; pointer-events: none;"></div>
 
                 <div class="question-badge" id="questionBadge" style="margin-bottom: 24px;">Question 1</div>
-                <div class="question-text" id="questionText" style="padding: 0; background: transparent; border: none; font-size: 1.8rem; font-weight: 700; color: #fff; line-height: 1.5; margin-bottom: 32px;"></div>
+                <div class="question-text" id="questionText" style="padding: 0; background: transparent; border: none; font-weight: 700; color: #fff; line-height: 1.5; margin-bottom: 32px;"></div>
                 <div class="options-grid" id="optionsContainer"></div>
 
                 <!-- Navigation -->
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:40px;padding-top:24px;border-top:1px solid var(--border);gap:16px;">
+                <div class="exam-nav-container">
                     <button type="button" id="prevBtn" class="btn btn-ghost exam-nav-btn" style="gap:8px;">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="15 18 9 12 15 6"/>
@@ -272,7 +361,7 @@
                         Previous
                     </button>
 
-                    <button type="button" id="reviewBtn" onclick="toggleReview()" class="btn exam-nav-btn" style="color:var(--yellow);gap:8px;">
+                    <button type="button" id="reviewBtn" onclick="toggleReview()" class="btn exam-nav-review-btn" style="gap:8px;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                         </svg>

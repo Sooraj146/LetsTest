@@ -106,14 +106,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         loader.style.display = 'none';
 
-        // Populate Topbar
+        // Populate Topbar and Sidebar details
         const topbarExamName    = document.getElementById('topbarExamName');
         const topbarStudentName = document.getElementById('topbarStudentName');
+        const sidebarStudentName = document.getElementById('sidebarStudentName');
         if (topbarExamName) {
             topbarExamName.textContent = examDetails ? examDetails.title : 'Assessment Session';
         }
         if (topbarStudentName) {
             topbarStudentName.textContent = student.name || `Candidate (${student.rollNumber})`;
+        }
+        if (sidebarStudentName) {
+            sidebarStudentName.textContent = student.name || `Candidate (${student.rollNumber})`;
         }
 
         if (!rawQuestions || !rawQuestions.length) {
@@ -296,12 +300,13 @@ function showQuestion(idx, skipAnimation = false) {
     if (reviewState.has(q._id)) {
         revBtn.style.background = 'rgba(255,215,64,0.15)';
         revBtn.style.borderColor = 'rgba(255,215,64,0.4)';
-        revBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="var(--yellow)" stroke="var(--yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Marked`;
+        revBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="var(--yellow)" stroke="var(--yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Marked for Review`;
     } else {
         revBtn.style.background = 'rgba(255,215,64,0.07)';
         revBtn.style.borderColor = 'rgba(255,215,64,0.2)';
-        revBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Mark`;
+        revBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Mark for Review`;
     }
+
 
     // Options
     const labels = ['A', 'B', 'C', 'D'];
