@@ -15,9 +15,12 @@ const {
   deleteStudent,
   bulkAddStudents,
   updateStudent,
-  getCollegeStats,
   deleteAllStudents,
   getStudentAnalysis,
+  getLogs,
+  toggleStudentBan,
+  deleteLog,
+  clearLogs,
 } = require('../controllers/adminController');
 const {
   createExam,
@@ -53,7 +56,9 @@ router.get('/accounts',      getAdminAccounts);
 router.post('/accounts',     createAdminAccount);
 router.put('/accounts/:id',    updateAdminAccount);
 router.delete('/accounts/:id', deleteAdminAccount);
-router.get('/college-stats',  getCollegeStats);
+router.get('/logs',           getLogs);
+router.delete('/logs/:id',    deleteLog);
+router.delete('/logs',        clearLogs);
 
 // ── Student management ─────────────────────────────────────────────
 router.get('/students',      getStudents);
@@ -63,6 +68,7 @@ router.post('/students/bulk', bulkAddStudents);
 router.delete('/students/:id', deleteStudent);
 router.delete('/students',     deleteAllStudents);
 router.get('/students/:id/analysis', getStudentAnalysis);
+router.post('/students/:id/ban',      toggleStudentBan);
 
 // ── Exam management ────────────────────────────────────────────────
 router.get('/exams',       getExams);

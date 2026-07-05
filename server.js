@@ -30,8 +30,10 @@ app.use('/api/questions', questionRoutes);
 app.use('/api/admin',     adminRoutes);
 
 // Explicit HTML page routes
-app.get('/admin',  (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-app.get('/result', (req, res) => res.sendFile(path.join(__dirname, 'public', 'result.html')));
+app.get('/admin',     (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/test',      (req, res) => res.sendFile(path.join(__dirname, 'public', 'test.html')));
+app.get('/result',    (req, res) => res.sendFile(path.join(__dirname, 'public', 'result.html')));
 
 // Fallback → index
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

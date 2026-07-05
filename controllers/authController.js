@@ -1,5 +1,8 @@
 const AdminAccount = require('../models/AdminAccount');
 const College = require('../models/College');
+const Student = require('../models/Student');
+const Exam = require('../models/Exam');
+const { logActivity } = require('./adminController');
 
 // @desc  Seed initial main admin and college if not exists
 exports.seedInitialAdmin = async () => {
@@ -58,8 +61,9 @@ exports.createCollege = async (req, res) => {
   if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
   try {
     const { name, domain } = req.body;
-    const cleanDomain = domain.toLowerCase().trim();
+    const cleanDomain = domain.trim();
     const college = await College.create({ name, domain: cleanDomain });
+    await logActivity(`Added college: ${name} (${cleanDomain})`, 'info', null, req.admin?.username);
     res.status(201).json(college);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -72,12 +76,13 @@ exports.updateCollege = async (req, res) => {
   if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
   try {
     const { name, domain } = req.body;
-    const cleanDomain = domain ? domain.toLowerCase().trim() : undefined;
+    const cleanDomain = domain ? domain.trim() : undefined;
     const updateData = { name };
     if (cleanDomain) updateData.domain = cleanDomain;
 
     const college = await College.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!college) return res.status(404).json({ message: 'College not found' });
+    await logActivity(`Updated college: ${name} (${college.domain})`, 'info', null, req.admin?.username);
     res.status(200).json(college);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -91,6 +96,7 @@ exports.deleteCollege = async (req, res) => {
   try {
     const college = await College.findByIdAndDelete(req.params.id);
     if (!college) return res.status(404).json({ message: 'College not found' });
+    await logActivity(`Removed college node: ${college.name}`, 'danger', null, req.admin?.username);
     res.status(200).json({ message: 'College deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -103,7 +109,16 @@ exports.getColleges = async (req, res) => {
   if (req.admin.role !== 'main') return res.status(403).json({ message: 'Main admin access required' });
   try {
     const colleges = await College.find();
-    res.status(200).json(colleges);
+    const results = await Promise.all(colleges.map(async (college) => {
+      const studentCount = await Student.countDocuments({ collegeId: college._id });
+      const examCount = await Exam.countDocuments({ collegeId: college._id });
+      return {
+        ...college.toObject(),
+        studentCount,
+        examCount
+      };
+    }));
+    res.status(200).json(results);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -128,6 +143,8 @@ exports.createAdminAccount = async (req, res) => {
   try {
     const { username, password, collegeId } = req.body;
     const account = await AdminAccount.create({ username, password, collegeId, role: 'mini' });
+    const college = await College.findById(collegeId);
+    await logActivity(`Created College Admin: ${username} mapped to ${college ? college.name : 'Unknown college'}`, 'info', collegeId, req.admin?.username);
     res.status(201).json(account);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -142,6 +159,8 @@ exports.updateAdminAccount = async (req, res) => {
     const { username, password, collegeId } = req.body;
     const account = await AdminAccount.findByIdAndUpdate(req.params.id, { username, password, collegeId }, { new: true });
     if (!account) return res.status(404).json({ message: 'Account not found' });
+    const college = await College.findById(collegeId);
+    await logActivity(`Updated College Admin: ${username} mapped to ${college ? college.name : 'Unknown college'}`, 'info', collegeId, req.admin?.username);
     res.status(200).json(account);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -155,6 +174,7 @@ exports.deleteAdminAccount = async (req, res) => {
   try {
     const account = await AdminAccount.findByIdAndDelete(req.params.id);
     if (!account) return res.status(404).json({ message: 'Account not found' });
+    await logActivity(`Revoked admin access for user: ${account.username}`, 'warning', account.collegeId, req.admin?.username);
     res.status(200).json({ message: 'Account deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

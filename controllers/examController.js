@@ -1,5 +1,6 @@
 const Exam = require('../models/Exam');
 const College = require('../models/College');
+const { logActivity } = require('./adminController');
 
 // Helper — get collegeId from admin or body
 function getCollegeId(req) {
@@ -36,6 +37,8 @@ exports.createExam = async (req, res) => {
       endTime:   endTime   || null,
     });
 
+    await logActivity(`Created test: ${title}`, 'info', targetCollege, req.admin?.username);
+
     res.status(201).json(exam);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -68,6 +71,9 @@ exports.updateExam = async (req, res) => {
       { new: true, runValidators: true }
     );
     if (!exam) return res.status(404).json({ message: 'Exam not found' });
+
+    await logActivity(`Updated test configuration: ${exam.title}`, 'info', exam.collegeId, req.admin?.username);
+
     res.status(200).json(exam);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -89,22 +95,41 @@ exports.deleteExam = async (req, res) => {
       User.deleteMany({ examId: req.params.id })
     ]);
 
+    await logActivity(`Removed exam: ${exam.title}`, 'warning', exam.collegeId, req.admin?.username);
+
     res.status(200).json({ message: 'Exam deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc  Get all exams for a college (admin)
+// @desc  Get all exams (admin)
 // @route GET /api/admin/exams
 exports.getExams = async (req, res) => {
   try {
     const collegeId = getCollegeId(req);
-    if (!collegeId) {
-      return res.status(400).json({ message: 'collegeId is required for main admin' });
-    }
-    const exams = await Exam.find({ collegeId }).sort({ startTime: -1 });
-    res.status(200).json(exams);
+    // If collegeId is not provided and user is main admin, query all exams
+    const query = collegeId ? { collegeId } : {};
+    const exams = await Exam.find(query).sort({ startTime: -1 });
+    
+    const Question = require('../models/Question');
+    const User = require('../models/User');
+
+    const results = await Promise.all(exams.map(async (exam) => {
+      const [studentCount, questionCount, sections] = await Promise.all([
+        User.countDocuments({ examId: exam._id }),
+        Question.countDocuments({ examId: exam._id }),
+        Question.distinct('section', { examId: exam._id })
+      ]);
+      return {
+        ...exam.toObject(),
+        studentCount,
+        questionCount,
+        sections: sections.map(s => s.trim()).filter(Boolean)
+      };
+    }));
+
+    res.status(200).json(results);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

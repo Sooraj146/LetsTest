@@ -2,6 +2,18 @@ const User = require('../models/User');
 const Question = require('../models/Question');
 const Student = require('../models/Student');
 const Exam = require('../models/Exam');
+const ActivityLog = require('../models/ActivityLog');
+
+const logActivity = async (text, type = 'info', collegeId = null, adminUsername = null) => {
+  try {
+    const formattedText = adminUsername ? `${text} (by ${adminUsername})` : text;
+    await ActivityLog.create({ text: formattedText, type, collegeId });
+  } catch (err) {
+    console.error('Failed to write activity log:', err);
+  }
+};
+exports.logActivity = logActivity;
+
 
 // Helper — get collegeId from admin or query (if main admin)
 function getCollegeId(req) {
@@ -16,43 +28,63 @@ function getCollegeId(req) {
 exports.getStudents = async (req, res) => {
   try {
     const collegeId = getCollegeId(req);
-    if (!collegeId) return res.status(400).json({ message: 'collegeId is required for main admin' });
+    const query = collegeId ? { collegeId } : {};
     
-    const students = await Student.find({ collegeId }).sort({ rollNumber: 1 });
+    const students = await Student.find(query).sort({ rollNumber: 1 });
     
     // Fetch active exam IDs to ignore deleted exams' submissions
-    const activeExams = await Exam.find({ collegeId }).select('_id');
+    const activeExams = await Exam.find(query).select('_id');
     const activeExamIds = activeExams.map(e => e._id);
     
-    // Aggregate stats for each student matching only active exams
-    const stats = await User.aggregate([
-      { 
-        $match: { 
-          collegeId: require('mongoose').Types.ObjectId.createFromHexString(collegeId.toString()), 
-          isSubmitted: true,
-          examId: { $in: activeExamIds }
-        } 
-      },
-      { 
-        $group: { 
-          _id: "$rollNumber", 
-          testCount: { $sum: 1 }, 
-          totalMarks: { $sum: "$totalScore" } 
-        } 
-      }
+    // Count questions per active exam to establish maximum possible score
+    const questionCounts = await Question.aggregate([
+      { $match: { examId: { $in: activeExamIds } } },
+      { $group: { _id: "$examId", count: { $sum: 1 } } }
     ]);
 
-    const statsMap = stats.reduce((acc, curr) => {
-      acc[curr._id] = curr;
+    const examMaxScores = questionCounts.reduce((acc, curr) => {
+      acc[curr._id.toString()] = curr.count;
       return acc;
     }, {});
 
+    // Fetch submissions matching active exams
+    const submissionsQuery = {
+      isSubmitted: true,
+      examId: { $in: activeExamIds }
+    };
+    if (collegeId) {
+      submissionsQuery.collegeId = require('mongoose').Types.ObjectId.createFromHexString(collegeId.toString());
+    }
+    const submissions = await User.find(submissionsQuery);
+
+    const studentSubmissionsMap = {};
+    submissions.forEach(sub => {
+      const roll = sub.rollNumber.toString();
+      if (!studentSubmissionsMap[roll]) {
+        studentSubmissionsMap[roll] = [];
+      }
+      studentSubmissionsMap[roll].push(sub);
+    });
+
     const results = students.map(s => {
-      const studentStats = statsMap[s.rollNumber.toString()] || { testCount: 0, totalMarks: 0 };
+      const subs = studentSubmissionsMap[s.rollNumber.toString()] || [];
+      let totalMarks = 0;
+      let totalPossible = 0;
+      subs.forEach(sub => {
+        const maxScore = examMaxScores[sub.examId.toString()] || 0;
+        if (maxScore > 0) {
+          totalMarks += sub.totalScore;
+          totalPossible += maxScore;
+        }
+      });
+      
+      const avgPercentage = totalPossible > 0 ? Math.round((totalMarks / totalPossible) * 100) : 0;
+      
       return {
         ...s.toObject(),
-        testCount: studentStats.testCount,
-        totalMarks: studentStats.totalMarks
+        testCount: subs.length,
+        totalMarks,
+        avgPercentage
       };
     });
 
@@ -66,12 +98,13 @@ exports.getStudents = async (req, res) => {
 // @route POST /api/admin/students
 exports.addStudent = async (req, res) => {
   try {
-    const { name, rollNumber } = req.body;
+    const { name, rollNumber, email, branch, semester } = req.body;
     const collegeId = getCollegeId(req);
     if (!name || rollNumber === undefined || !collegeId) {
       return res.status(400).json({ message: 'Name, roll number and collegeId are required' });
     }
-    const student = await Student.create({ name, rollNumber, collegeId });
+    const student = await Student.create({ name, rollNumber, email, branch, semester, collegeId });
+    await logActivity(`Enrolled student: ${name} (${rollNumber})`, 'info', collegeId, req.admin?.username);
     res.status(201).json(student);
   } catch (error) {
     if (error.code === 11000) {
@@ -85,7 +118,7 @@ exports.addStudent = async (req, res) => {
 // @route PUT /api/admin/students/:id
 exports.updateStudent = async (req, res) => {
   try {
-    const { name, rollNumber } = req.body;
+    const { name, rollNumber, email, branch, semester } = req.body;
     const oldStudent = await Student.findById(req.params.id);
     if (!oldStudent) return res.status(404).json({ message: 'Student not found' });
 
@@ -95,6 +128,9 @@ exports.updateStudent = async (req, res) => {
     // Update the student record
     oldStudent.name = name;
     oldStudent.rollNumber = rollNumber;
+    oldStudent.email = email || '';
+    oldStudent.branch = branch || '';
+    oldStudent.semester = semester || '';
     await oldStudent.save();
 
     // If roll number changed, sync all previous test results
@@ -104,6 +140,8 @@ exports.updateStudent = async (req, res) => {
         { rollNumber: newRoll }
       );
     }
+
+    await logActivity(`Updated student record: ${name} (${rollNumber})`, 'info', oldStudent.collegeId, req.admin?.username);
 
     res.status(200).json(oldStudent);
   } catch (error) {
@@ -120,6 +158,7 @@ exports.deleteStudent = async (req, res) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
     if (!student) return res.status(404).json({ message: 'Student not found' });
+    await logActivity(`Removed student record: ${student.name} (${student.rollNumber})`, 'warning', student.collegeId, req.admin?.username);
     res.status(200).json({ message: 'Student deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -134,31 +173,8 @@ exports.deleteAllStudents = async (req, res) => {
     if (!collegeId) return res.status(400).json({ message: 'collegeId is required' });
     
     const result = await Student.deleteMany({ collegeId });
+    await logActivity(`Purged all students roster (${result.deletedCount} students)`, 'danger', collegeId, req.admin?.username);
     res.status(200).json({ message: `${result.deletedCount} students removed successfully.` });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc  Get college-wide stats
-// @route GET /api/admin/college-stats
-exports.getCollegeStats = async (req, res) => {
-  try {
-    const collegeId = getCollegeId(req);
-    if (!collegeId) return res.status(400).json({ message: 'collegeId is required' });
-
-    const cid = require('mongoose').Types.ObjectId.createFromHexString(collegeId.toString());
-    
-    // Total tests
-    const testCount = await Exam.countDocuments({ collegeId: cid });
-
-    // Total possible marks (sum of question counts across all tests of this college)
-    const exams = await Exam.find({ collegeId: cid }).select('_id');
-    const examIds = exams.map(e => e._id);
-    
-    const totalPossibleMarks = await Question.countDocuments({ examId: { $in: examIds } });
-
-    res.status(200).json({ testCount, totalPossibleMarks });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -178,6 +194,8 @@ exports.bulkAddStudents = async (req, res) => {
     // We use insertMany with ordered: false to continue even if some fail (e.g. duplicate roll numbers)
     const result = await Student.insertMany(withCollegeId, { ordered: false });
     
+    await logActivity(`Bulk enrolled ${result.length} students via CSV`, 'info', collegeId, req.admin?.username);
+
     res.status(201).json({
       message: `${result.length} students added successfully.`,
       count: result.length
@@ -185,6 +203,7 @@ exports.bulkAddStudents = async (req, res) => {
   } catch (error) {
     if (error.code === 11000 || (error.writeErrors && error.writeErrors.length > 0)) {
       const insertedCount = error.insertedDocs ? error.insertedDocs.length : 0;
+      await logActivity(`Bulk enrolled ${insertedCount} students via CSV (some duplicates skipped)`, 'info', collegeId, req.admin?.username);
       return res.status(201).json({
         message: `Processed with some duplicates. ${insertedCount} new students added.`,
         count: insertedCount
@@ -422,25 +441,52 @@ exports.getStudentAnalysis = async (req, res) => {
     }
 
     // Get all exams belonging to this specific student's college
-    const collegeExams = await Exam.find({ collegeId: student.collegeId._id }).select('_id');
+    const collegeExams = await Exam.find({ collegeId: student.collegeId._id }).sort({ startTime: -1 });
     const examIds = collegeExams.map(e => e._id);
 
     // Fetch submissions strictly matching the roll number AND exams from their college
     const submissions = await User.find({ 
-      rollNumber: student.rollNumber, 
+      rollNumber: student.rollNumber.toString(), 
       examId: { $in: examIds },
       isSubmitted: true 
     }).populate('examId', 'title startTime');
 
-
     const examsAssigned = collegeExams.length;
+
+    // Compile the list of exams and the student's status for each
+    const examsList = [];
+    for (const exam of collegeExams) {
+      const questionsCount = await Question.countDocuments({ examId: exam._id });
+      const sub = submissions.find(s => s.examId && s.examId._id.toString() === exam._id.toString());
+      const isBanned = student.bannedExams ? student.bannedExams.some(bid => bid.toString() === exam._id.toString()) : false;
+      examsList.push({
+        examId: exam._id,
+        title: exam.title,
+        startTime: exam.startTime,
+        endTime: exam.endTime,
+        isBanned,
+        questionsCount,
+        submission: sub ? {
+          score: sub.totalScore,
+          submittedAt: sub.submittedAt || sub.updatedAt
+        } : null
+      });
+    }
 
     if (submissions.length === 0) {
       return res.status(200).json({
-        student: { name: student.name, rollNumber: student.rollNumber, college: student.collegeId.name },
+        student: { 
+          name: student.name, 
+          rollNumber: student.rollNumber, 
+          college: student.collegeId.name,
+          email: student.email || '',
+          branch: student.branch || '',
+          semester: student.semester || ''
+        },
         metrics: { gpa: 0, participation: 0, testsTaken: 0, testsAssigned: examsAssigned, precision: 0 },
         radarData: {},
         trendData: [],
+        examsList
       });
     }
 
@@ -493,12 +539,123 @@ exports.getStudentAnalysis = async (req, res) => {
     const precision = totalAttemptedQuestions > 0 ? Math.round((totalCorrectAnswers / totalAttemptedQuestions) * 100) : 0;
 
     res.status(200).json({
-      student: { name: student.name, rollNumber: student.rollNumber, college: student.collegeId.name },
+      student: { 
+        name: student.name, 
+        rollNumber: student.rollNumber, 
+        college: student.collegeId.name,
+        email: student.email || '',
+        branch: student.branch || '',
+        semester: student.semester || ''
+      },
       metrics: { gpa, participation, testsTaken: submissions.length, testsAssigned: examsAssigned, precision },
       radarData,
-      trendData: trendData.sort((a, b) => new Date(a.date) - new Date(b.date))
+      trendData: trendData.sort((a, b) => new Date(a.date) - new Date(b.date)),
+      examsList
     });
 
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Toggle student exam ban/restriction
+// @route POST /api/admin/students/:id/ban
+exports.toggleStudentBan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { examId } = req.body;
+    if (!examId) return res.status(400).json({ message: 'examId is required' });
+
+    const student = await Student.findById(id);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    if (!student.bannedExams) student.bannedExams = [];
+    
+    const bannedExamsStr = student.bannedExams.map(e => e.toString());
+    const index = bannedExamsStr.indexOf(examId.toString());
+
+    let isBanned = false;
+    if (index === -1) {
+      student.bannedExams.push(examId);
+      isBanned = true;
+      await logActivity(`Banned student: ${student.name} (${student.rollNumber}) from exam ${examId}`, 'danger', student.collegeId, req.admin?.username);
+    } else {
+      student.bannedExams.splice(index, 1);
+      await logActivity(`Restored exam access for student: ${student.name} (${student.rollNumber}) for exam ${examId}`, 'info', student.collegeId, req.admin?.username);
+    }
+
+    await student.save();
+    res.status(200).json({ isBanned, message: isBanned ? 'Restricted' : 'Allowed' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Get system logs
+// @route GET /api/admin/logs
+exports.getLogs = async (req, res) => {
+  try {
+    const collegeId = getCollegeId(req);
+    let query = {};
+    if (collegeId) {
+      query = { collegeId };
+    }
+    const logs = await ActivityLog.find(query).sort({ createdAt: -1 }).limit(50);
+    
+    const mapped = logs.map(l => {
+      const date = new Date(l.createdAt);
+      const timeStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+      return {
+        id: l._id,
+        text: l.text,
+        type: l.type,
+        time: timeStr
+      };
+    });
+    res.status(200).json(mapped);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Delete a single log entry
+// @route DELETE /api/admin/logs/:id
+exports.deleteLog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const collegeId = getCollegeId(req);
+    const query = { _id: id };
+    
+    // Mini-admins can only delete logs for their own college
+    if (req.admin.role !== 'main') {
+      query.collegeId = collegeId;
+    }
+    
+    const log = await ActivityLog.findOneAndDelete(query);
+    if (!log) return res.status(404).json({ message: 'Log entry not found' });
+    
+    res.status(200).json({ message: 'Log entry deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc  Clear all log entries
+// @route DELETE /api/admin/logs
+exports.clearLogs = async (req, res) => {
+  try {
+    const collegeId = getCollegeId(req);
+    const query = {};
+    
+    // Mini-admins can only clear logs for their own college
+    if (req.admin.role !== 'main') {
+      query.collegeId = collegeId;
+    } else if (collegeId) {
+      query.collegeId = collegeId;
+    }
+    
+    const result = await ActivityLog.deleteMany(query);
+    res.status(200).json({ message: `${result.deletedCount} log(s) cleared successfully` });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -20,7 +20,7 @@ exports.login = async (req, res) => {
     // 1. Identify college from email domain
     const emailLower = email.toLowerCase().trim();
     const emailDomain = '@' + emailLower.split('@')[1];
-    const college = await College.findOne({ domain: emailDomain });
+    const college = await College.findOne({ domain: { $regex: new RegExp('^' + emailDomain + '$', 'i') } });
     if (!college) {
       return res.status(404).json({ message: 'College domain not registered' });
     }
@@ -126,7 +126,7 @@ exports.registerUser = async (req, res) => {
     // Identify college by email domain
     const emailLower = email.toLowerCase().trim();
     const emailDomain = '@' + emailLower.split('@')[1];
-    const college = await College.findOne({ domain: emailDomain });
+    const college = await College.findOne({ domain: { $regex: new RegExp('^' + emailDomain + '$', 'i') } });
     if (!college) {
       return res.status(400).json({ message: 'Your college is not registered on this platform.' });
     }
@@ -140,6 +140,11 @@ exports.registerUser = async (req, res) => {
     const student = await Student.findOne({ rollNumber: roll, collegeId: college._id });
     if (!student) {
       return res.status(404).json({ message: 'Student roll number not found for your college.' });
+    }
+
+    // Check if the student is banned from this exam
+    if (student.bannedExams && student.bannedExams.some(bid => bid.toString() === examId.toString())) {
+      return res.status(403).json({ message: 'You have been restricted from taking this exam by the system administrator.' });
     }
 
     const rollStr = rollNumber.toString();
