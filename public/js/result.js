@@ -253,7 +253,62 @@
     console.error(err);
   }
 
-  // ── Download Answer Key PDF ────────────────────────────
+  // ── Download Answer Key PDF ────────────────────────────────
+
+  /**
+   * Load an image from a URL and return a Base64 JPEG data-URL via canvas.
+   * Returns null if loading fails (CORS, network error, etc.)
+   */
+  function imageToDataUrl(src) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width  = img.naturalWidth  || img.width  || 1;
+          canvas.height = img.naturalHeight || img.height || 1;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.92));
+        } catch (e) {
+          resolve(null); // canvas taint / CORS — skip silently
+        }
+      };
+      img.onerror = () => resolve(null);
+      // Append cache-buster for same-origin paths to avoid stale cached no-cors responses
+      img.src = src.startsWith('http') ? src : `${src}?_cb=${Date.now()}`;
+    });
+  }
+
+  /**
+   * Draw an image into the PDF document at (x, y), scaled to fit within
+   * maxW × maxH mm while preserving aspect ratio.
+   * Returns the actual height in mm used, or 0 on failure.
+   */
+  async function addImageToPDF(doc, src, x, y, maxW, maxH) {
+    const dataUrl = await imageToDataUrl(src);
+    if (!dataUrl) return 0;
+
+    return new Promise((resolve) => {
+      const probe = new Image();
+      probe.onload = () => {
+        const nw = probe.naturalWidth  || 200;
+        const nh = probe.naturalHeight || 200;
+        let drawW = maxW;
+        let drawH = (nh / nw) * drawW;
+        if (drawH > maxH) {
+          drawH = maxH;
+          drawW = (nw / nh) * drawH;
+        }
+        doc.addImage(dataUrl, 'JPEG', x, y, drawW, drawH);
+        resolve(drawH);
+      };
+      probe.onerror = () => resolve(0);
+      probe.src = dataUrl;
+    });
+  }
+
   async function downloadAnswerKey() {
     const btn = document.getElementById('downloadAnswerKey');
     const orig = btn ? btn.innerHTML : '';
@@ -276,6 +331,16 @@
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF('p', 'mm', 'a4');
 
+      // ── Page constants ──────────────────────────────────
+      const PAGE_H       = 297;  // A4 height in mm
+      const MARGIN       = 14;
+      const CONTENT_W    = 182;  // 210 - 2 * MARGIN
+      const IMG_MAX_W    = CONTENT_W; // question image: full width
+      const IMG_MAX_H    = 65;        // question image: max height
+      const OPT_IMG_MAX_W = 55;       // option image: max width
+      const OPT_IMG_MAX_H = 38;       // option image: max height
+
+      // ── Header ─────────────────────────────────────────
       doc.setFillColor(10, 10, 15);
       doc.rect(0, 0, 210, 42, 'F');
       doc.setFillColor(0, 229, 255);
@@ -283,7 +348,7 @@
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('OFFICIAL ANSWER KEY', 14, 16);
+      doc.text('OFFICIAL ANSWER KEY', MARGIN, 16);
 
       const sectionsList = data.sections || [];
       const sectionLabel = sectionsList.length > 0
@@ -291,45 +356,101 @@
         : 'SECTIONS: —';
       doc.setFontSize(10);
       doc.setTextColor(0, 229, 255);
-      doc.text(sectionLabel, 14, 26);
+      doc.text(sectionLabel, MARGIN, 26);
 
       let y = 52;
 
-      sectionsList.forEach(section => {
-        const questionsList = data.questions[section] || [];
-        if (y > 255) { doc.addPage(); y = 20; }
+      // Ensure there is at least `needed` mm before the bottom margin; add page if not
+      function ensureSpace(needed) {
+        if (y + needed > PAGE_H - 10) {
+          doc.addPage();
+          y = 20;
+        }
+      }
 
+      // ── Sections & Questions ────────────────────────────
+      for (const section of sectionsList) {
+        const questionsList = data.questions[section] || [];
+        ensureSpace(20);
+
+        // Section heading
         doc.setFontSize(12);
         doc.setTextColor(10, 10, 15);
         doc.setFont('helvetica', 'bold');
-        doc.text(`SECTION: ${section.toUpperCase()}`, 14, y + 6);
+        doc.text(`SECTION: ${section.toUpperCase()}`, MARGIN, y + 6);
         doc.setDrawColor(226, 232, 240);
         doc.setLineWidth(0.5);
-        doc.line(14, y + 8, 196, y + 8);
+        doc.line(MARGIN, y + 8, 196, y + 8);
         y += 16;
 
-        questionsList.forEach((q, i) => {
-          if (y > 270) { doc.addPage(); y = 20; }
+        for (let i = 0; i < questionsList.length; i++) {
+          const q = questionsList[i];
+          ensureSpace(14);
+
+          // Question text
           doc.setFontSize(10);
           doc.setTextColor(30, 41, 59);
           doc.setFont('helvetica', 'bold');
-          const qText = doc.splitTextToSize(`Q${i + 1}. ${q.questionText}`, 174);
-          doc.text(qText, 14, y);
-          y += (qText.length * 5) + 3;
+          const qLabel = `Q${i + 1}. ${q.questionText || (q.questionImage ? '' : '(No text)')}`;
+          const qLines = doc.splitTextToSize(qLabel, CONTENT_W);
+          doc.text(qLines, MARGIN, y);
+          y += (qLines.length * 5) + 2;
 
+          // Question image (if any)
+          if (q.questionImage) {
+            ensureSpace(IMG_MAX_H + 6);
+            const imgH = await addImageToPDF(doc, q.questionImage, MARGIN, y, IMG_MAX_W, IMG_MAX_H);
+            if (imgH > 0) y += imgH + 5;
+          }
+
+          y += 1; // gap before options
+
+          // Options
           const opts = q.options || [];
-          opts.forEach((opt, idx) => {
-            const isCorrect = String(idx) === String(q.correctAnswer);
-            const optLabel = String.fromCharCode(65 + idx);
-            const optText = doc.splitTextToSize(`${optLabel}. ${opt}`, 166);
-            const boxHeight = (optText.length * 5) + 4;
-            if (y + boxHeight > 282) { doc.addPage(); y = 20; }
+          for (let idx = 0; idx < opts.length; idx++) {
+            const opt = opts[idx];
+            const isCorrect  = String(idx) === String(q.correctAnswer);
+            const optLabel   = String.fromCharCode(65 + idx);
+            const rawText    = typeof opt === 'string' ? opt : (opt.text || '');
+            const optImgSrc  = (opt && typeof opt === 'object') ? (opt.image || '') : '';
 
+            const optLines = rawText
+              ? doc.splitTextToSize(`${optLabel}. ${rawText}`, CONTENT_W - 10)
+              : [`${optLabel}.`];
+            const textBlockH = (optLines.length * 5) + 4;
+
+            // Pre-load option image to know its drawn height before drawing the highlight box
+            let optImgDataUrl = null;
+            let optImgDrawH   = 0;
+            if (optImgSrc) {
+              optImgDataUrl = await imageToDataUrl(optImgSrc);
+              if (optImgDataUrl) {
+                const tmpImg = await new Promise(r => {
+                  const im = new Image();
+                  im.onload  = () => r(im);
+                  im.onerror = () => r(null);
+                  im.src = optImgDataUrl;
+                });
+                if (tmpImg) {
+                  const nw = tmpImg.naturalWidth  || 100;
+                  const nh = tmpImg.naturalHeight || 100;
+                  let dw = OPT_IMG_MAX_W;
+                  let dh = (nh / nw) * dw;
+                  if (dh > OPT_IMG_MAX_H) { dh = OPT_IMG_MAX_H; dw = (nw / nh) * dh; }
+                  optImgDrawH = dh;
+                }
+              }
+            }
+
+            const boxH = textBlockH + (optImgDataUrl && optImgDrawH > 0 ? optImgDrawH + 4 : 0);
+            ensureSpace(boxH + 3);
+
+            // Correct-answer highlight
             if (isCorrect) {
               doc.setFillColor(240, 253, 244);
-              doc.rect(18, y, 174, boxHeight, 'F');
+              doc.rect(18, y, CONTENT_W - 4, boxH, 'F');
               doc.setFillColor(34, 197, 94);
-              doc.rect(18, y, 2, boxHeight, 'F');
+              doc.rect(18, y, 2, boxH, 'F');
               doc.setTextColor(21, 128, 61);
               doc.setFont('helvetica', 'bold');
             } else {
@@ -337,18 +458,28 @@
               doc.setFont('helvetica', 'normal');
             }
 
-            doc.text(optText, 24, y + 5);
-            y += boxHeight + 1.5;
-          });
-          y += 5;
-        });
-      });
+            doc.text(optLines, 24, y + 5);
+            let localY = y + textBlockH;
+
+            // Embed option image
+            if (optImgDataUrl && optImgDrawH > 0) {
+              doc.addImage(optImgDataUrl, 'JPEG', 24, localY, OPT_IMG_MAX_W, optImgDrawH);
+            }
+
+            y += boxH + 2;
+          }
+
+          y += 7; // gap between questions
+        }
+      }
 
       const safeTitle = examTitle.replace(/[^a-zA-Z0-9\s\-_]/g, '').trim();
       doc.save(`Answer Key - ${safeTitle}.pdf`);
       LetsTest.toast('Answer key downloaded successfully', 'success');
+
     } catch (err) {
       LetsTest.toast(err.message || 'Answer key download failed', 'error');
+      console.error('Answer key PDF error:', err);
     } finally {
       if (btn) { btn.disabled = false; btn.innerHTML = orig; }
     }

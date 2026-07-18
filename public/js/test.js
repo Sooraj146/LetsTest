@@ -199,7 +199,17 @@
       textEl.style.opacity = '0';
       textEl.style.transform = 'translateX(20px)';
       setTimeout(() => {
-        textEl.innerHTML = `<span class="question-prefix">Q${currentIndex + 1}.</span> ${q.questionText || 'Question text not available.'}`;
+        // Show prefix only when there is text
+        const hasText = !!(q.questionText && q.questionText.trim());
+        const textHtml = hasText
+          ? `<span class="question-prefix">Q${currentIndex + 1}.</span> ${q.questionText}`
+          : `<span class="question-prefix" style="opacity:0.4;">Q${currentIndex + 1}.</span>`;
+        const imgHtml = q.questionImage
+          ? `<div class="question-media-wrapper">
+               <img src="${q.questionImage}" class="question-media zoomable" alt="Question image" onclick="openExamLightbox('${q.questionImage}')" title="Click to enlarge" />
+             </div>`
+          : '';
+        textEl.innerHTML = textHtml + imgHtml;
         textEl.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
         textEl.style.opacity = '1';
         textEl.style.transform = 'translateX(0)';
@@ -223,9 +233,24 @@
         item.classList.add('selected');
       }
 
+      const optText = typeof opt === 'string' ? opt : (opt?.text || '');
+      const optImg  = (opt && typeof opt === 'object') ? (opt.image || '') : '';
+      const hasText = !!optText.trim();
+      const hasImg  = !!optImg;
+
+      // Mark image-only options so CSS can style them differently
+      if (!hasText && hasImg) item.classList.add('option-item--img-only');
+
+      const optImgHtml = hasImg
+        ? `<img src="${optImg}" class="option-media zoomable" alt="Option ${idx + 1} image" onclick="openExamLightbox('${optImg}')" title="Click to enlarge" />`
+        : '';
+
       item.innerHTML = `
         <div class="option-marker">${markers[idx] || (idx + 1)}</div>
-        <div class="option-text">${opt}</div>
+        <div class="option-content">
+          ${hasText ? `<div class="option-text">${optText}</div>` : ''}
+          ${optImgHtml}
+        </div>
       `;
 
       item.addEventListener('click', () => selectOption(idx, originalIdx));

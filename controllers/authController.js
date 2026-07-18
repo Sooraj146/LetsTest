@@ -31,6 +31,36 @@ exports.seedInitialAdmin = async () => {
       mainAdmin.password = password;
       await mainAdmin.save();
     }
+
+    // Automatically migrate legacy string options in MongoDB to the new object schema format
+    const mongoose = require('mongoose');
+    const db = mongoose.connection.db;
+    if (db) {
+      const rawQuestions = await db.collection('questions').find({}).toArray();
+      let migratedCount = 0;
+      for (const rawQ of rawQuestions) {
+        let changed = false;
+        if (Array.isArray(rawQ.options)) {
+          const newOptions = rawQ.options.map(opt => {
+            if (typeof opt === 'string') {
+              changed = true;
+              return { text: opt, image: '' };
+            }
+            return opt;
+          });
+          if (changed) {
+            await db.collection('questions').updateOne(
+              { _id: rawQ._id },
+              { $set: { options: newOptions } }
+            );
+            migratedCount++;
+          }
+        }
+      }
+      if (migratedCount > 0) {
+        console.log(`Migrated ${migratedCount} questions options from String to Object format.`);
+      }
+    }
   } catch (error) {
     console.error('Seeding error:', error);
   }

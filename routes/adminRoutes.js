@@ -1,5 +1,33 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
 const adminAuth = require('../middleware/adminAuth');
+
+const uploadDir = path.join(__dirname, '../public/uploads/questions');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage }).fields([
+  { name: 'questionImage', maxCount: 1 },
+  { name: 'optionImage0', maxCount: 1 },
+  { name: 'optionImage1', maxCount: 1 },
+  { name: 'optionImage2', maxCount: 1 },
+  { name: 'optionImage3', maxCount: 1 }
+]);
+
 const {
   getLeaderboard,
   getQuestionAnalytics,
@@ -83,9 +111,9 @@ router.get('/analytics',   getQuestionAnalytics);
 
 // ── Questions (require ?examId=xxx or examId in body) ──────────────
 router.get('/questions',        getAdminQuestions);
-router.post('/questions',       addQuestion);
+router.post('/questions',       upload, addQuestion);
 router.post('/questions/bulk',  bulkAddQuestions);
-router.put('/questions/:id',    updateQuestion);
+router.put('/questions/:id',    upload, updateQuestion);
 router.delete('/questions/:id', deleteQuestion);
 router.delete('/questions',     clearAllQuestions);
 

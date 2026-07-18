@@ -476,25 +476,73 @@ const AdminDashboard = {
                 e.preventDefault();
                 const qId = document.getElementById('qbankEditQuestionId').value;
                 const questionText = document.getElementById('qbText').value.trim();
-                const options = [
+                const optTexts = [
                     document.getElementById('qbOpt0').value.trim(),
                     document.getElementById('qbOpt1').value.trim(),
                     document.getElementById('qbOpt2').value.trim(),
                     document.getElementById('qbOpt3').value.trim()
                 ];
-                const correctAnswer = Number(document.getElementById('qbCorrect').value);
+                const correctAnswer = document.getElementById('qbCorrect').value;
                 const section = document.getElementById('qbSection').value.trim();
+
+                // Validation: correct answer must be selected
+                if (correctAnswer === '' || correctAnswer === null || correctAnswer === undefined) {
+                    const hintEl = document.getElementById('qbCorrectHint');
+                    if (hintEl) hintEl.style.display = 'inline';
+                    return notify('Please select the correct answer option', 'error');
+                }
 
                 const isEdit = !!qId;
                 const url = isEdit ? `/api/admin/questions/${qId}` : '/api/admin/questions';
                 const method = isEdit ? 'PUT' : 'POST';
-                const body = { examId: currentEditingTestId, section, questionText, options, correctAnswer: String(correctAnswer) };
+
+                // Validation: question must have either text or image
+                const qImageFile = document.getElementById('qbImage').files[0];
+                const hasQImage = qImageFile || (isEdit && this.deleteQuestionImageFlag === false && examQuestions.find(item => item._id === qId)?.questionImage);
+                if (!questionText && !hasQImage) {
+                    return notify('Question must have either a statement text or an attached image', 'error');
+                }
+
+                // Validation: each of the 4 options must have either text or image
+                for (let i = 0; i < 4; i++) {
+                    const optFile = document.getElementById(`qbOptImage${i}`).files[0];
+                    const hasOptImage = optFile || (isEdit && this[`deleteOptionImageFlag${i}`] === false && examQuestions.find(item => item._id === qId)?.options[i]?.image);
+                    if (!optTexts[i] && !hasOptImage) {
+                        return notify(`Option ${String.fromCharCode(65 + i)} must have either text or an attached image`, 'error');
+                    }
+                }
+
+                const formData = new FormData();
+                formData.append('examId', currentEditingTestId);
+                formData.append('section', section);
+                formData.append('questionText', questionText);
+                formData.append('correctAnswer', correctAnswer);
+                formData.append('optionTexts', JSON.stringify(optTexts));
+
+                if (qImageFile) {
+                    formData.append('questionImage', qImageFile);
+                } else if (isEdit && this.deleteQuestionImageFlag) {
+                    formData.append('deleteQuestionImage', 'true');
+                }
+
+                for (let i = 0; i < 4; i++) {
+                    const optFile = document.getElementById(`qbOptImage${i}`).files[0];
+                    if (optFile) {
+                        formData.append(`optionImage${i}`, optFile);
+                    } else if (isEdit && this[`deleteOptionImageFlag${i}`]) {
+                        formData.append(`deleteOptionImage${i}`, 'true');
+                    }
+                }
+
+                // Get auth headers and remove Content-Type to let browser generate boundary
+                const headers = getAuthHeaders();
+                delete headers['Content-Type'];
 
                 try {
                     const res = await fetch(url, {
                         method,
-                        headers: getAuthHeaders(),
-                        body: JSON.stringify(body)
+                        headers,
+                        body: formData
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.message || 'Error saving question');
@@ -1743,10 +1791,11 @@ const AdminDashboard = {
                 html += `
                     <div class="question-item" style="margin-bottom: 0;">
                       <div class="question-item__header">
-                        <div class="question-item__title">
-                          <span class="qbank-qnum">Q${displayNum++}.</span> ${q.questionText}
+                        <div class="question-item__title" style="flex:1;">
+                          <span class="qbank-qnum">Q${displayNum++}.</span> ${q.questionText || (q.questionImage ? '' : '<i>(No text statement)</i>')}
+                          ${q.questionImage ? `<img src="${q.questionImage}" class="question-item__img-preview zoomable" onclick="AdminDashboard.openLightbox('${q.questionImage}')" title="Click to enlarge" />` : ''}
                         </div>
-                        <div style="display:flex; gap:12px; align-items:center;">
+                        <div style="display:flex; gap:12px; align-items:center; align-self: flex-start;">
                           <button class="btn-table-action" onclick="AdminDashboard.openEditQuestion('${q._id}')">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                           </button>
@@ -1756,15 +1805,22 @@ const AdminDashboard = {
                         </div>
                       </div>
                       <div class="question-item__options-list">
-                        ${q.options.map((opt, oIdx) => `
-                          <div class="question-item__option ${oIdx === Number(q.correctAnswer) ? 'question-item__option--correct' : ''}">
-                            ${String.fromCharCode(65 + oIdx)}. ${opt}
-                          </div>
-                        `).join('')}
+                        ${q.options.map((opt, oIdx) => {
+                          const isCorrect = oIdx === Number(q.correctAnswer);
+                          const optText = typeof opt === 'string' ? opt : (opt.text || '');
+                          const optImg = (opt && opt.image) ? `<img src="${opt.image}" class="option-item__img-preview zoomable" onclick="AdminDashboard.openLightbox('${opt.image}')" title="Click to enlarge" />` : '';
+                          return `
+                            <div class="question-item__option ${isCorrect ? 'question-item__option--correct' : ''}">
+                              <strong>${String.fromCharCode(65 + oIdx)}.</strong> ${optText}
+                              ${optImg}
+                            </div>
+                          `;
+                        }).join('')}
                       </div>
                     </div>
                 `;
             });
+
 
             html += `
                   </div>
@@ -1773,6 +1829,108 @@ const AdminDashboard = {
         });
 
         listEl.innerHTML = html;
+    },
+
+    // ── Image Lightbox ──────────────────────────────────────────
+    openLightbox(src) {
+        const overlay = document.getElementById('imgLightbox');
+        const img = document.getElementById('imgLightboxImg');
+        if (!overlay || !img) return;
+        img.src = src;
+        overlay.classList.add('active');
+        // Close on Escape key
+        this._lightboxKeyHandler = (e) => { if (e.key === 'Escape') this.closeLightbox(null); };
+        document.addEventListener('keydown', this._lightboxKeyHandler);
+    },
+
+    closeLightbox(event) {
+        // If called from backdrop click, only close when clicking outside the image
+        if (event && event.target !== document.getElementById('imgLightbox')) return;
+        const overlay = document.getElementById('imgLightbox');
+        if (overlay) overlay.classList.remove('active');
+        if (this._lightboxKeyHandler) {
+            document.removeEventListener('keydown', this._lightboxKeyHandler);
+            this._lightboxKeyHandler = null;
+        }
+    },
+
+    toggleUploadTriggerVisibility(previewId, show) {
+        let zoneId;
+        if (previewId === 'qbImagePreview') {
+            zoneId = 'qbImageZone';
+        } else if (previewId.startsWith('qbOptImagePreview')) {
+            const index = previewId.replace('qbOptImagePreview', '');
+            zoneId = `qbOptImageZone${index}`;
+        }
+        if (zoneId) {
+            const zoneEl = document.getElementById(zoneId);
+            if (zoneEl) {
+                zoneEl.style.display = show ? '' : 'none';
+            }
+        }
+    },
+
+    handleImagePreview(event, previewId) {
+        const file = event.target.files[0];
+        const previewEl = document.getElementById(previewId);
+        if (!previewEl) return;
+        
+        if (!file) {
+            previewEl.style.display = 'none';
+            previewEl.innerHTML = '';
+            this.toggleUploadTriggerVisibility(previewId, true);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            previewEl.style.display = 'flex';
+            previewEl.innerHTML = `
+                <img src="${e.target.result}" alt="Preview" />
+                <span>${file.name}</span>
+                <button type="button" onclick="AdminDashboard.clearImageInput('${event.target.id}', '${previewId}')">Clear</button>
+            `;
+            this.toggleUploadTriggerVisibility(previewId, false);
+        };
+        reader.readAsDataURL(file);
+    },
+
+    clearImageInput(inputId, previewId) {
+        const inputEl = document.getElementById(inputId);
+        if (inputEl) inputEl.value = '';
+        const previewEl = document.getElementById(previewId);
+        if (previewEl) {
+            previewEl.style.display = 'none';
+            previewEl.innerHTML = '';
+        }
+        
+        this.toggleUploadTriggerVisibility(previewId, true);
+
+        const isEdit = !!document.getElementById('qbankEditQuestionId').value;
+        if (isEdit) {
+            if (inputId === 'qbImage') {
+                this.deleteQuestionImageFlag = true;
+            } else if (inputId.startsWith('qbOptImage')) {
+                const index = inputId.replace('qbOptImage', '');
+                this[`deleteOptionImageFlag${index}`] = true;
+            }
+        }
+    },
+
+    selectCorrectOption(index) {
+        // Update hidden input
+        document.getElementById('qbCorrect').value = String(index);
+        // Hide hint
+        const hintEl = document.getElementById('qbCorrectHint');
+        if (hintEl) hintEl.style.display = 'none';
+        // Update chip visual state
+        document.querySelectorAll('.qb-correct-chip').forEach(chip => {
+            chip.classList.toggle('active', Number(chip.dataset.value) === index);
+        });
+        // Update option badge highlight
+        document.querySelectorAll('.qb-option-row').forEach((row, i) => {
+            row.classList.toggle('is-correct', i === index);
+        });
     },
 
     openEditQuestion(qId) {
@@ -1785,13 +1943,51 @@ const AdminDashboard = {
         document.getElementById('qbSubmitBtn').textContent = 'Sync Changes';
 
         document.getElementById('qbankEditQuestionId').value = qId;
-        document.getElementById('qbText').value = q.questionText;
-        document.getElementById('qbOpt0').value = q.options[0] || '';
-        document.getElementById('qbOpt1').value = q.options[1] || '';
-        document.getElementById('qbOpt2').value = q.options[2] || '';
-        document.getElementById('qbOpt3').value = q.options[3] || '';
-        document.getElementById('qbCorrect').value = q.correctAnswer;
+        document.getElementById('qbText').value = q.questionText || '';
+        document.getElementById('qbOpt0').value = typeof q.options[0] === 'string' ? q.options[0] : (q.options[0]?.text || '');
+        document.getElementById('qbOpt1').value = typeof q.options[1] === 'string' ? q.options[1] : (q.options[1]?.text || '');
+        document.getElementById('qbOpt2').value = typeof q.options[2] === 'string' ? q.options[2] : (q.options[2]?.text || '');
+        document.getElementById('qbOpt3').value = typeof q.options[3] === 'string' ? q.options[3] : (q.options[3]?.text || '');
+        // Pre-select the correct answer chip
+        this.selectCorrectOption(Number(q.correctAnswer));
         document.getElementById('qbSection').value = q.section || 'Section A';
+
+        // Reset delete flags
+        this.deleteQuestionImageFlag = false;
+        this.deleteOptionImageFlag0 = false;
+        this.deleteOptionImageFlag1 = false;
+        this.deleteOptionImageFlag2 = false;
+        this.deleteOptionImageFlag3 = false;
+
+        // Show previews for existing images
+        if (q.questionImage) {
+            const qPreview = document.getElementById('qbImagePreview');
+            if (qPreview) {
+                qPreview.style.display = 'flex';
+                qPreview.innerHTML = `
+                    <img src="${q.questionImage}" alt="Question Image" />
+                    <span>Existing Image</span>
+                    <button type="button" onclick="AdminDashboard.clearImageInput('qbImage', 'qbImagePreview')">Remove</button>
+                `;
+                this.toggleUploadTriggerVisibility('qbImagePreview', false);
+            }
+        }
+
+        for (let i = 0; i < 4; i++) {
+            const opt = q.options[i];
+            if (opt && opt.image) {
+                const optPreview = document.getElementById(`qbOptImagePreview${i}`);
+                if (optPreview) {
+                    optPreview.style.display = 'flex';
+                    optPreview.innerHTML = `
+                        <img src="${opt.image}" alt="Option ${i} Image" />
+                        <span>Existing Image</span>
+                        <button type="button" onclick="AdminDashboard.clearImageInput('qbOptImage${i}', 'qbOptImagePreview${i}')">Remove</button>
+                    `;
+                    this.toggleUploadTriggerVisibility(`qbOptImagePreview${i}`, false);
+                }
+            }
+        }
     },
 
     resetQuestionForm() {
@@ -1800,6 +1996,28 @@ const AdminDashboard = {
         const form = document.getElementById('qbankQuestionForm');
         if (form) form.reset();
         document.getElementById('qbankEditQuestionId').value = '';
+        // Clear the chip picker
+        document.getElementById('qbCorrect').value = '';
+        document.querySelectorAll('.qb-option-row').forEach(r => r.classList.remove('is-correct'));
+        const hintEl = document.getElementById('qbCorrectHint');
+        if (hintEl) hintEl.style.display = 'none';
+
+        // Clear previews
+        ['qbImagePreview', 'qbOptImagePreview0', 'qbOptImagePreview1', 'qbOptImagePreview2', 'qbOptImagePreview3'].forEach(id => {
+            const previewEl = document.getElementById(id);
+            if (previewEl) {
+                previewEl.style.display = 'none';
+                previewEl.innerHTML = '';
+            }
+            this.toggleUploadTriggerVisibility(id, true);
+        });
+
+        // Reset flags
+        this.deleteQuestionImageFlag = false;
+        this.deleteOptionImageFlag0 = false;
+        this.deleteOptionImageFlag1 = false;
+        this.deleteOptionImageFlag2 = false;
+        this.deleteOptionImageFlag3 = false;
     },
 
     hideQuestionForm() {
@@ -1942,14 +2160,15 @@ const AdminDashboard = {
 
         let csvContent = 'Section,QuestionText,OptionA,OptionB,OptionC,OptionD,CorrectAnswer\n';
         examQuestions.forEach(q => {
-            const correctOptionText = q.options[Number(q.correctAnswer)] || '';
+            const correctOptObj = q.options[Number(q.correctAnswer)];
+            const correctOptionText = typeof correctOptObj === 'string' ? correctOptObj : (correctOptObj?.text || '');
             const line = [
                 formatCSVField(q.section || 'General'),
                 formatCSVField(q.questionText),
-                formatCSVField(q.options[0] || ''),
-                formatCSVField(q.options[1] || ''),
-                formatCSVField(q.options[2] || ''),
-                formatCSVField(q.options[3] || ''),
+                formatCSVField(typeof q.options[0] === 'string' ? q.options[0] : (q.options[0]?.text || '')),
+                formatCSVField(typeof q.options[1] === 'string' ? q.options[1] : (q.options[1]?.text || '')),
+                formatCSVField(typeof q.options[2] === 'string' ? q.options[2] : (q.options[2]?.text || '')),
+                formatCSVField(typeof q.options[3] === 'string' ? q.options[3] : (q.options[3]?.text || '')),
                 formatCSVField(correctOptionText)
             ].join(',');
             csvContent += line + '\n';
@@ -2383,9 +2602,16 @@ const AdminDashboard = {
         // Find the full question from examQuestions to get correct answer and options
         const fullQ = examQuestions.find(q => q._id === questionId);
         let correctAnswerText = '—';
+        let correctOptImgHtml = '';
         if (fullQ && fullQ.options) {
             const index = Number(fullQ.correctAnswer);
-            correctAnswerText = fullQ.options[index] || '—';
+            const optVal = fullQ.options[index];
+            if (optVal) {
+                correctAnswerText = typeof optVal === 'string' ? optVal : (optVal.text || '');
+                if (optVal.image) {
+                    correctOptImgHtml = `<img src="${optVal.image}" style="max-height: 40px; vertical-align: middle; margin-left: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);" />`;
+                }
+            }
         }
         const sectionName = aData.section || 'General';
 
@@ -2393,16 +2619,22 @@ const AdminDashboard = {
         const sectionQuestions = analyticsData.filter(q => (q.section || 'General') === sectionName);
         const qNumInSection = sectionQuestions.findIndex(q => q._id === questionId) + 1;
 
+        const qImgHtml = (fullQ && fullQ.questionImage)
+            ? `<img src="${fullQ.questionImage}" style="max-width: 100%; max-height: 180px; display: block; margin-top: 10px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);" />`
+            : '';
+
         qDetailEl.innerHTML = `
             <div class="metrics-qdetail-card">
                 <div class="metrics-qdetail-header">
                     <span class="metrics-qdetail-badge">${sectionName}</span>
                     <span class="metrics-qdetail-qnum">Question ${qNumInSection}</span>
                 </div>
-                <p class="metrics-qdetail-text">${aData.questionText}</p>
-                <div class="metrics-qdetail-answer">
+                <p class="metrics-qdetail-text">${aData.questionText || (fullQ && fullQ.questionImage ? '' : '<i>(No text statement)</i>')}</p>
+                ${qImgHtml}
+                <div class="metrics-qdetail-answer" style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     <span>Correct Answer: <strong>${correctAnswerText}</strong></span>
+                    ${correctOptImgHtml}
                 </div>
                 <div class="metrics-qdetail-stats">
                     <div class="metrics-qdetail-stat metrics-qdetail-stat--correct">

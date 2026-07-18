@@ -866,57 +866,101 @@
 
   <!-- Modal: Compile/Edit Question (Overlay Pop-up) -->
   <div class="modal-overlay hidden" id="qbankFormModal" style="z-index: 10005;">
-    <div class="modal glass-card glass-card--strong admin-modal" style="max-width: 500px;">
+    <div class="modal glass-card glass-card--strong admin-modal qb-form-modal">
       <div class="modal-header">
         <h3 id="qbankFormTitle">Compile New Question</h3>
         <button class="modal-close-btn" onclick="AdminDashboard.hideQuestionForm()">✕</button>
       </div>
-      <form id="qbankQuestionForm" style="display:grid; gap:14px; font-size:0.82rem;">
+      <form id="qbankQuestionForm" style="display:grid; gap:16px; font-size:0.82rem;">
         <input type="hidden" id="qbankEditQuestionId" value="">
-        
+        <input type="hidden" id="qbCorrect" value="">
+
         <div class="input-group" style="margin-bottom:0;">
           <label for="qbSection">Exam Section</label>
-          <input type="text" class="input-field" id="qbSection" placeholder="e.g. Section A" required style="padding: 10px 14px; font-size:0.85rem;">
+          <input type="text" class="input-field" id="qbSection" placeholder="e.g. Section A" required style="padding:10px 14px; font-size:0.85rem;">
         </div>
 
+        <!-- Question statement + image upload side-by-side -->
         <div class="input-group" style="margin-bottom:0;">
-          <label for="qbText">Question Statement</label>
-          <textarea class="input-field" id="qbText" placeholder="Enter problem statement..." required style="padding: 10px 14px; font-size:0.85rem; height:80px; resize:vertical; font-family:inherit;"></textarea>
-        </div>
-        
-        <div style="display:grid; grid-template-columns: 1fr; gap:10px;">
-          <div class="input-group" style="margin-bottom:0;">
-            <label>Option A</label>
-            <input type="text" class="input-field" id="qbOpt0" placeholder="Choice A" required style="padding: 8px 12px; font-size:0.85rem;">
-          </div>
-          <div class="input-group" style="margin-bottom:0;">
-            <label>Option B</label>
-            <input type="text" class="input-field" id="qbOpt1" placeholder="Choice B" required style="padding: 8px 12px; font-size:0.85rem;">
-          </div>
-          <div class="input-group" style="margin-bottom:0;">
-            <label>Option C</label>
-            <input type="text" class="input-field" id="qbOpt2" placeholder="Choice C" required style="padding: 8px 12px; font-size:0.85rem;">
-          </div>
-          <div class="input-group" style="margin-bottom:0;">
-            <label>Option D</label>
-            <input type="text" class="input-field" id="qbOpt3" placeholder="Choice D" required style="padding: 8px 12px; font-size:0.85rem;">
-          </div>
-        </div>
-        
-        <div class="input-group" style="margin-bottom:4px;">
-          <label for="qbCorrect">Correct Option</label>
-          <div class="select-wrapper">
-            <select class="select-field" id="qbCorrect" required style="padding: 10px 30px 10px 12px; font-size:0.85rem;">
-              <option value="" disabled selected>Select Answer</option>
-              <option value="0">A</option>
-              <option value="1">B</option>
-              <option value="2">C</option>
-              <option value="3">D</option>
-            </select>
+          <label for="qbText">
+            Question Statement
+            <span style="color:var(--text-muted); font-weight:400; font-size:0.73rem; margin-left:6px;">(optional when image is provided)</span>
+          </label>
+          <div class="qb-question-row">
+            <textarea class="input-field" id="qbText" placeholder="Enter problem statement..." style="padding:10px 14px; font-size:0.85rem; height:88px; resize:none; font-family:inherit; flex:1; min-width:0;"></textarea>
+            <label for="qbImage" class="qb-img-upload-zone qb-img-upload-zone--side" id="qbImageZone" title="Attach question image">
+              <input type="file" id="qbImage" accept="image/*" style="display:none;" onchange="AdminDashboard.handleImagePreview(event, 'qbImagePreview')">
+              <i data-lucide="image-plus" class="qb-img-upload-icon"></i>
+              <span class="qb-img-upload-text">Attach<br>Image</span>
+            </label>
+            <div id="qbImagePreview" class="img-upload-preview" style="display:none;"></div>
           </div>
         </div>
 
-        <div style="display:flex; gap:10px; margin-top:10px;">
+        <!-- Options — badge click = select correct answer -->
+        <div>
+          <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:8px;">
+            <label style="font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-secondary); margin:0;">Answer Options</label>
+            <span style="font-size:0.72rem; color:var(--text-muted); font-weight:400;">— click the letter badge to mark as correct</span>
+            <span id="qbCorrectHint" style="color:var(--accent-red); font-size:0.73rem; display:none; margin-left:auto;">⚠ Select correct answer</span>
+          </div>
+          <div style="display:grid; gap:8px;">
+            <!-- Option A -->
+            <div class="qb-option-row" id="qbOptionRow0">
+              <div class="qb-option-fields">
+                <button type="button" class="qb-option-badge" data-opt="0" onclick="AdminDashboard.selectCorrectOption(0)" title="Mark A as correct answer">A</button>
+                <input type="text" class="input-field qb-opt-input" id="qbOpt0" placeholder="Type option A…" autocomplete="off">
+                <label for="qbOptImage0" class="qb-opt-img-btn" id="qbOptImageZone0" title="Attach image for Option A">
+                  <input type="file" id="qbOptImage0" accept="image/*" style="display:none;" onchange="AdminDashboard.handleImagePreview(event, 'qbOptImagePreview0')">
+                  <i data-lucide="image" style="width:13px;height:13px;"></i>
+                  <span>Image</span>
+                </label>
+                <div id="qbOptImagePreview0" class="img-upload-preview" style="display:none;"></div>
+              </div>
+            </div>
+            <!-- Option B -->
+            <div class="qb-option-row" id="qbOptionRow1">
+              <div class="qb-option-fields">
+                <button type="button" class="qb-option-badge" data-opt="1" onclick="AdminDashboard.selectCorrectOption(1)" title="Mark B as correct answer">B</button>
+                <input type="text" class="input-field qb-opt-input" id="qbOpt1" placeholder="Type option B…" autocomplete="off">
+                <label for="qbOptImage1" class="qb-opt-img-btn" id="qbOptImageZone1" title="Attach image for Option B">
+                  <input type="file" id="qbOptImage1" accept="image/*" style="display:none;" onchange="AdminDashboard.handleImagePreview(event, 'qbOptImagePreview1')">
+                  <i data-lucide="image" style="width:13px;height:13px;"></i>
+                  <span>Image</span>
+                </label>
+                <div id="qbOptImagePreview1" class="img-upload-preview" style="display:none;"></div>
+              </div>
+            </div>
+            <!-- Option C -->
+            <div class="qb-option-row" id="qbOptionRow2">
+              <div class="qb-option-fields">
+                <button type="button" class="qb-option-badge" data-opt="2" onclick="AdminDashboard.selectCorrectOption(2)" title="Mark C as correct answer">C</button>
+                <input type="text" class="input-field qb-opt-input" id="qbOpt2" placeholder="Type option C…" autocomplete="off">
+                <label for="qbOptImage2" class="qb-opt-img-btn" id="qbOptImageZone2" title="Attach image for Option C">
+                  <input type="file" id="qbOptImage2" accept="image/*" style="display:none;" onchange="AdminDashboard.handleImagePreview(event, 'qbOptImagePreview2')">
+                  <i data-lucide="image" style="width:13px;height:13px;"></i>
+                  <span>Image</span>
+                </label>
+                <div id="qbOptImagePreview2" class="img-upload-preview" style="display:none;"></div>
+              </div>
+            </div>
+            <!-- Option D -->
+            <div class="qb-option-row" id="qbOptionRow3">
+              <div class="qb-option-fields">
+                <button type="button" class="qb-option-badge" data-opt="3" onclick="AdminDashboard.selectCorrectOption(3)" title="Mark D as correct answer">D</button>
+                <input type="text" class="input-field qb-opt-input" id="qbOpt3" placeholder="Type option D…" autocomplete="off">
+                <label for="qbOptImage3" class="qb-opt-img-btn" id="qbOptImageZone3" title="Attach image for Option D">
+                  <input type="file" id="qbOptImage3" accept="image/*" style="display:none;" onchange="AdminDashboard.handleImagePreview(event, 'qbOptImagePreview3')">
+                  <i data-lucide="image" style="width:13px;height:13px;"></i>
+                  <span>Image</span>
+                </label>
+                <div id="qbOptImagePreview3" class="img-upload-preview" style="display:none;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:4px;">
           <button type="button" id="qbCancelBtn" class="btn btn--secondary" onclick="AdminDashboard.hideQuestionForm()" style="flex:1;">Discard</button>
           <button type="submit" id="qbSubmitBtn" class="btn btn--primary" style="flex:2;">Compile Question</button>
         </div>
@@ -1066,6 +1110,16 @@
           <button onclick="document.getElementById('csvFile').click()" class="px-8 py-3 bg-dark-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border border-white/5 hover:bg-dark-700 transition-all" style="padding:10px 16px; font-size:0.8rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-subtle); cursor:pointer; color:#fff;">Select System File</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- IMAGE LIGHTBOX OVERLAY                                    -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="imgLightbox" class="img-lightbox-overlay" onclick="AdminDashboard.closeLightbox(event)" role="dialog" aria-modal="true" aria-label="Image preview">
+    <div class="img-lightbox-content">
+      <button class="img-lightbox-close" onclick="AdminDashboard.closeLightbox(null)" title="Close">&times;</button>
+      <img id="imgLightboxImg" src="" alt="Enlarged preview" class="img-lightbox-img" />
     </div>
   </div>
 

@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const User = require('../models/User');
 const Question = require('../models/Question');
 const Student = require('../models/Student');
@@ -309,18 +311,60 @@ exports.getAdminQuestions = async (req, res) => {
   }
 };
 
+const deleteLocalFile = (relativePath) => {
+  if (!relativePath) return;
+  const absolutePath = path.join(__dirname, '../public', relativePath);
+  fs.unlink(absolutePath, (err) => {
+    if (err && err.code !== 'ENOENT') {
+      console.error(`Failed to delete local file: ${absolutePath}`, err);
+    }
+  });
+};
+
 // @desc  Add a question to a specific exam
 // @route POST /api/admin/questions
 exports.addQuestion = async (req, res) => {
   try {
-    const { examId, section, questionText, options, correctAnswer } = req.body;
-    if (!examId || !section || !questionText || !options || !correctAnswer) {
-      return res.status(400).json({ message: 'All fields are required including examId' });
+    const { examId, section, questionText, correctAnswer } = req.body;
+    if (!examId || !section || !correctAnswer) {
+      return res.status(400).json({ message: 'examId, section, and correctAnswer are required' });
     }
-    if (options.length !== 4) {
-      return res.status(400).json({ message: 'Exactly 4 options required' });
+
+    let optionTexts = [];
+    if (req.body.optionTexts) {
+      try {
+        optionTexts = JSON.parse(req.body.optionTexts);
+      } catch (err) {
+        return res.status(400).json({ message: 'Invalid optionTexts array format' });
+      }
+    } else if (req.body.options) {
+      optionTexts = Array.isArray(req.body.options) ? req.body.options : [];
     }
-    const question = await Question.create({ examId, section, questionText, options, correctAnswer });
+
+    const questionImage = (req.files && req.files['questionImage'] && req.files['questionImage'][0])
+      ? `/uploads/questions/${req.files['questionImage'][0].filename}`
+      : '';
+
+    const options = [];
+    for (let i = 0; i < 4; i++) {
+      const imgFile = (req.files && req.files[`optionImage${i}`] && req.files[`optionImage${i}`][0])
+        ? `/uploads/questions/${req.files[`optionImage${i}`][0].filename}`
+        : '';
+      options.push({
+        text: optionTexts[i] || '',
+        image: imgFile
+      });
+    }
+
+    const question = await Question.create({
+      examId,
+      section,
+      questionText: questionText || '',
+      questionImage,
+      options,
+      correctAnswer
+    });
+
     res.status(201).json(question);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -331,13 +375,68 @@ exports.addQuestion = async (req, res) => {
 // @route PUT /api/admin/questions/:id
 exports.updateQuestion = async (req, res) => {
   try {
-    const { section, questionText, options, correctAnswer } = req.body;
-    const question = await Question.findByIdAndUpdate(
-      req.params.id,
-      { section, questionText, options, correctAnswer },
-      { new: true, runValidators: true }
-    );
+    const question = await Question.findById(req.params.id);
     if (!question) return res.status(404).json({ message: 'Question not found' });
+
+    const { section, questionText, correctAnswer } = req.body;
+
+    let optionTexts = [];
+    if (req.body.optionTexts) {
+      try {
+        optionTexts = JSON.parse(req.body.optionTexts);
+      } catch (err) {
+        return res.status(400).json({ message: 'Invalid optionTexts array format' });
+      }
+    } else if (req.body.options) {
+      optionTexts = Array.isArray(req.body.options) ? req.body.options : [];
+    }
+
+    // Handle question image update
+    let questionImage = question.questionImage;
+    if (req.files && req.files['questionImage'] && req.files['questionImage'][0]) {
+      if (question.questionImage) {
+        deleteLocalFile(question.questionImage);
+      }
+      questionImage = `/uploads/questions/${req.files['questionImage'][0].filename}`;
+    } else if (req.body.deleteQuestionImage === 'true') {
+      if (question.questionImage) {
+        deleteLocalFile(question.questionImage);
+      }
+      questionImage = '';
+    }
+
+    // Handle options update
+    const options = [];
+    for (let i = 0; i < 4; i++) {
+      const existingOpt = question.options[i] || { text: '', image: '' };
+      let optImage = existingOpt.image;
+
+      if (req.files && req.files[`optionImage${i}`] && req.files[`optionImage${i}`][0]) {
+        if (existingOpt.image) {
+          deleteLocalFile(existingOpt.image);
+        }
+        optImage = `/uploads/questions/${req.files[`optionImage${i}`][0].filename}`;
+      } else if (req.body[`deleteOptionImage${i}`] === 'true') {
+        if (existingOpt.image) {
+          deleteLocalFile(existingOpt.image);
+        }
+        optImage = '';
+      }
+
+      options.push({
+        text: optionTexts[i] !== undefined ? optionTexts[i] : (existingOpt.text || ''),
+        image: optImage
+      });
+    }
+
+    question.section = section || question.section;
+    question.questionText = questionText !== undefined ? questionText : question.questionText;
+    question.questionImage = questionImage;
+    question.options = options;
+    question.correctAnswer = correctAnswer !== undefined ? correctAnswer : question.correctAnswer;
+
+    await question.save();
+
     res.status(200).json(question);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -348,8 +447,21 @@ exports.updateQuestion = async (req, res) => {
 // @route DELETE /api/admin/questions/:id
 exports.deleteQuestion = async (req, res) => {
   try {
-    const question = await Question.findByIdAndDelete(req.params.id);
+    const question = await Question.findById(req.params.id);
     if (!question) return res.status(404).json({ message: 'Question not found' });
+
+    if (question.questionImage) {
+      deleteLocalFile(question.questionImage);
+    }
+    if (Array.isArray(question.options)) {
+      question.options.forEach(opt => {
+        if (opt.image) {
+          deleteLocalFile(opt.image);
+        }
+      });
+    }
+
+    await Question.findByIdAndDelete(req.params.id);
     res.status(200).json({ message: 'Question deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -375,6 +487,21 @@ exports.clearAllQuestions = async (req, res) => {
   try {
     const examId = requireExamId(req, res);
     if (!examId) return;
+
+    const questions = await Question.find({ examId });
+    questions.forEach(q => {
+      if (q.questionImage) {
+        deleteLocalFile(q.questionImage);
+      }
+      if (Array.isArray(q.options)) {
+        q.options.forEach(opt => {
+          if (opt.image) {
+            deleteLocalFile(opt.image);
+          }
+        });
+      }
+    });
+
     const result = await Question.deleteMany({ examId });
     res.status(200).json({ message: `${result.deletedCount} question(s) cleared.` });
   } catch (error) {
@@ -400,9 +527,17 @@ exports.bulkAddQuestions = async (req, res) => {
     const uniqueIncomingTexts = new Set();
 
     for (const q of questions) {
-      const trimmedText = q.questionText.trim();
+      const trimmedText = q.questionText ? q.questionText.trim() : '';
       if (!existingTexts.has(trimmedText) && !uniqueIncomingTexts.has(trimmedText)) {
-        toInsert.push({ ...q, examId });
+        const mappedOptions = Array.isArray(q.options)
+          ? q.options.map(opt => typeof opt === 'string' ? { text: opt, image: '' } : opt)
+          : [];
+        toInsert.push({
+          ...q,
+          questionText: trimmedText,
+          options: mappedOptions,
+          examId
+        });
         uniqueIncomingTexts.add(trimmedText);
       }
     }

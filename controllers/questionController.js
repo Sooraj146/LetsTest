@@ -14,6 +14,7 @@ exports.getAnswerKey = async (req, res) => {
       if (!grouped[q.section]) grouped[q.section] = [];
       grouped[q.section].push({
         questionText:  q.questionText,
+        questionImage: q.questionImage,
         options:       q.options,
         correctAnswer: q.correctAnswer,
       });
