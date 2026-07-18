@@ -312,7 +312,7 @@ exports.getAdminQuestions = async (req, res) => {
 };
 
 const deleteLocalFile = (relativePath) => {
-  if (!relativePath) return;
+  if (!relativePath || relativePath.startsWith('data:')) return;
   const absolutePath = path.join(__dirname, '../public', relativePath);
   fs.unlink(absolutePath, (err) => {
     if (err && err.code !== 'ENOENT') {
@@ -342,13 +342,13 @@ exports.addQuestion = async (req, res) => {
     }
 
     const questionImage = (req.files && req.files['questionImage'] && req.files['questionImage'][0])
-      ? `/uploads/questions/${req.files['questionImage'][0].filename}`
+      ? `data:${req.files['questionImage'][0].mimetype};base64,${req.files['questionImage'][0].buffer.toString('base64')}`
       : '';
 
     const options = [];
     for (let i = 0; i < 4; i++) {
       const imgFile = (req.files && req.files[`optionImage${i}`] && req.files[`optionImage${i}`][0])
-        ? `/uploads/questions/${req.files[`optionImage${i}`][0].filename}`
+        ? `data:${req.files[`optionImage${i}`][0].mimetype};base64,${req.files[`optionImage${i}`][0].buffer.toString('base64')}`
         : '';
       options.push({
         text: optionTexts[i] || '',
@@ -397,7 +397,7 @@ exports.updateQuestion = async (req, res) => {
       if (question.questionImage) {
         deleteLocalFile(question.questionImage);
       }
-      questionImage = `/uploads/questions/${req.files['questionImage'][0].filename}`;
+      questionImage = `data:${req.files['questionImage'][0].mimetype};base64,${req.files['questionImage'][0].buffer.toString('base64')}`;
     } else if (req.body.deleteQuestionImage === 'true') {
       if (question.questionImage) {
         deleteLocalFile(question.questionImage);
@@ -415,7 +415,7 @@ exports.updateQuestion = async (req, res) => {
         if (existingOpt.image) {
           deleteLocalFile(existingOpt.image);
         }
-        optImage = `/uploads/questions/${req.files[`optionImage${i}`][0].filename}`;
+        optImage = `data:${req.files[`optionImage${i}`][0].mimetype};base64,${req.files[`optionImage${i}`][0].buffer.toString('base64')}`;
       } else if (req.body[`deleteOptionImage${i}`] === 'true') {
         if (existingOpt.image) {
           deleteLocalFile(existingOpt.image);

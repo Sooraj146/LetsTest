@@ -260,6 +260,9 @@
    * Returns null if loading fails (CORS, network error, etc.)
    */
   function imageToDataUrl(src) {
+    if (src && src.startsWith('data:')) {
+      return Promise.resolve(src);
+    }
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
