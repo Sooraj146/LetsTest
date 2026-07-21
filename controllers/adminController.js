@@ -204,7 +204,7 @@ exports.bulkAddStudents = async (req, res) => {
     });
   } catch (error) {
     if (error.code === 11000 || (error.writeErrors && error.writeErrors.length > 0)) {
-      const insertedCount = error.insertedDocs ? error.insertedDocs.length : 0;
+      const insertedCount = error.insertedCount ?? (error.insertedDocs ? error.insertedDocs.length : (error.result?.nInserted ?? 0));
       await logActivity(`Bulk enrolled ${insertedCount} students via CSV (some duplicates skipped)`, 'info', collegeId, req.admin?.username);
       return res.status(201).json({
         message: `Processed with some duplicates. ${insertedCount} new students added.`,

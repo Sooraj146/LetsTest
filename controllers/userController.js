@@ -269,7 +269,10 @@ exports.getResult = async (req, res) => {
   try {
     const { examId, rollNumber } = req.params;
 
-    const user = await User.findOne({ rollNumber, examId });
+    const [user, exam] = await Promise.all([
+      User.findOne({ rollNumber, examId }),
+      Exam.findById(examId).select('isAnswerKeyPublished')
+    ]);
     if (!user) return res.status(404).json({ message: 'User not found for this exam' });
     if (!user.isSubmitted) return res.status(400).json({ message: 'Test not yet submitted' });
 
@@ -314,6 +317,7 @@ exports.getResult = async (req, res) => {
       name:          user.name,
       rollNumber:    user.rollNumber,
       examId,
+      isAnswerKeyPublished: exam ? (exam.isAnswerKeyPublished !== false) : true,
       sectionScores:    parsedSectionScores,
       sectionDetails,
       totalScore:       user.totalScore,

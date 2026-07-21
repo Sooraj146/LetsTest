@@ -40,6 +40,7 @@ const {
   updateExam,
   deleteExam,
   getExams,
+  toggleAnswerKey,
 } = require('../controllers/examController');
 const {
   login,
@@ -87,6 +88,7 @@ router.post('/students/:id/ban',      toggleStudentBan);
 router.get('/exams',       getExams);
 router.post('/exams',      createExam);
 router.put('/exams/:id',   updateExam);
+router.post('/exams/:id/toggle-answer-key', toggleAnswerKey);
 router.delete('/exams/:id', deleteExam);
 
 

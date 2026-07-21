@@ -810,6 +810,16 @@
             </select>
           </div>
         </div>
+        <div class="input-group" style="margin-top: 14px; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-subtle);">
+          <div>
+            <label for="tAnswerKeyToggle" style="margin: 0; font-size: 0.85rem; font-weight: 700; color: #fff; cursor: pointer;">Answer Key Access</label>
+            <p style="margin: 2px 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Allow candidates to view/download the answer key PDF</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="tAnswerKeyToggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
         <div class="modal-form-footer">
           <button type="button" class="btn btn--secondary" onclick="AdminDashboard.closeActiveModal('addTestModal')">Cancel</button>
           <button type="submit" class="btn btn--primary" id="addTestSubmitBtn">Initialize Exam Shell</button>

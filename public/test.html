@@ -40,8 +40,17 @@
             <div class="timer__label">Remaining Time</div>
           </div>
         </div>
+
+        <!-- Question Navigator Toggle Button for Mobile -->
+        <button class="btn btn--secondary nav-toggle-btn" id="togglePanel" title="Question Navigator">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
+          <span class="nav-toggle-text">Navigator</span>
+        </button>
       </div>
     </header>
+
+    <!-- Mobile Side Panel Backdrop Overlay -->
+    <div class="side-panel-backdrop" id="sidePanelBackdrop"></div>
 
     <!-- ── Main Layout ───────────────────────────────────── -->
     <div class="test-layout">
@@ -88,6 +97,11 @@
 
       <!-- ── Side Panel ──────────────────────────────────── -->
       <aside class="side-panel" id="sidePanel">
+        <!-- Mobile Header -->
+        <div class="side-panel-mobile-header">
+          <span>Question Navigator</span>
+          <button class="modal-close-btn" id="closeSidePanel">✕</button>
+        </div>
 
 
 

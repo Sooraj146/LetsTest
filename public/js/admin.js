@@ -448,6 +448,7 @@ const AdminDashboard = {
                 const startTime = document.getElementById('tStartTime').value ? new Date(document.getElementById('tStartTime').value).toISOString() : null;
                 const endTime = document.getElementById('tEndTime').value ? new Date(document.getElementById('tEndTime').value).toISOString() : null;
                 const collegeId = currentAdmin.role === 'mini' ? selectedCollegeId : document.getElementById('tCollege').value;
+                const isAnswerKeyPublished = document.getElementById('tAnswerKeyToggle') ? document.getElementById('tAnswerKeyToggle').checked : true;
 
                 const isUpdate = document.getElementById('addTestSubmitBtn').textContent === 'Save Changes';
                 const method = isUpdate ? 'PUT' : 'POST';
@@ -457,7 +458,7 @@ const AdminDashboard = {
                     const res = await fetch(url, {
                         method,
                         headers: getAuthHeaders(),
-                        body: JSON.stringify({ title, startTime, endTime, collegeId })
+                        body: JSON.stringify({ title, startTime, endTime, collegeId, isAnswerKeyPublished })
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.message || 'Error processing exam');
@@ -1381,35 +1382,96 @@ const AdminDashboard = {
         const file = input.files[0];
         if (!file) return;
 
+        let targetCollegeId = selectedCollegeId;
+        if (currentAdmin.role === 'main') {
+            const stdColFilter = document.getElementById('filterStudentCollege');
+            if (stdColFilter && stdColFilter.value) {
+                targetCollegeId = stdColFilter.value;
+            }
+        }
+
+        if (!targetCollegeId) {
+            notify('Please select a college first', 'error');
+            input.value = '';
+            return;
+        }
+
         Papa.parse(file, {
-            header: true,
+            header: false,
             skipEmptyLines: true,
             complete: async (results) => {
                 let data = results.data;
                 try {
-                    // Normalize fields
-                    const students = data.map(s => ({
-                        name: s.name.toUpperCase(),
-                        rollNumber: Number(s.rollNumber),
-                        email: s.email || '',
-                        branch: s.branch || '',
-                        semester: s.semester || '6th Semester'
-                    })).filter(s => s.name && !isNaN(s.rollNumber));
+                    if (!data || data.length === 0) throw new Error('No data found in CSV.');
 
-                    if (students.length === 0) throw new Error('No valid records parsed from CSV.');
+                    let startIdx = 0;
+                    const firstRow = data[0];
+
+                    let rollIdx = 0;
+                    let nameIdx = 1;
+                    let emailIdx = -1;
+                    let branchIdx = -1;
+                    let semIdx = -1;
+
+                    const col0Str = firstRow[0] !== undefined ? String(firstRow[0]).trim() : '';
+                    const col1Str = firstRow[1] !== undefined ? String(firstRow[1]).trim() : '';
+
+                    const isHeader = isNaN(Number(col0Str)) || 
+                                     /roll|name|email|branch|sem/i.test(col0Str) || 
+                                     /roll|name|email|branch|sem/i.test(col1Str);
+
+                    if (isHeader) {
+                        startIdx = 1;
+                        firstRow.forEach((col, idx) => {
+                            const val = String(col).trim().toLowerCase();
+                            if (/roll|sl|id/i.test(val)) rollIdx = idx;
+                            else if (/name|student/i.test(val)) nameIdx = idx;
+                            else if (/email|mail/i.test(val)) emailIdx = idx;
+                            else if (/branch|dept/i.test(val)) branchIdx = idx;
+                            else if (/sem/i.test(val)) semIdx = idx;
+                        });
+                    }
+
+                    const students = [];
+                    for (let i = startIdx; i < data.length; i++) {
+                        const row = data[i];
+                        if (!row || row.length === 0) continue;
+
+                        const rawRoll = row[rollIdx] !== undefined ? String(row[rollIdx]).trim() : '';
+                        const rawName = row[nameIdx] !== undefined ? String(row[nameIdx]).trim() : '';
+
+                        const rollNumber = Number(rawRoll);
+                        const name = rawName.toUpperCase();
+
+                        if (name && !isNaN(rollNumber)) {
+                            students.push({
+                                name,
+                                rollNumber,
+                                email: emailIdx >= 0 && row[emailIdx] ? String(row[emailIdx]).trim() : '',
+                                branch: branchIdx >= 0 && row[branchIdx] ? String(row[branchIdx]).trim() : '',
+                                semester: semIdx >= 0 && row[semIdx] ? String(row[semIdx]).trim() : '6th Semester'
+                            });
+                        }
+                    }
+
+                    if (students.length === 0) throw new Error('No valid student records parsed from CSV.');
 
                     const res = await fetch('/api/admin/students/bulk', {
                         method: 'POST',
                         headers: getAuthHeaders(),
-                        body: JSON.stringify({ collegeId: selectedCollegeId, students })
+                        body: JSON.stringify({ collegeId: targetCollegeId, students })
                     });
                     const resData = await res.json();
                     if (!res.ok) throw new Error(resData.message || 'Bulk upload failed');
 
                     notify(resData.message, 'success');
                     this.closeActiveModal('bulkStudentModal');
-                    this.renderPanel('students');
-                } catch (err) { notify(err.message, 'error'); }
+                    input.value = '';
+                    this.renderStudentsList();
+                } catch (err) {
+                    notify(err.message, 'error');
+                    input.value = '';
+                }
             }
         });
     },
@@ -1639,6 +1701,21 @@ const AdminDashboard = {
                         <div class="test-card__sections-row">
                           ${sectionsHtml}
                         </div>
+
+                        <div class="test-card__ak-row">
+                          <span class="test-card__ak-label" style="color: ${t.isAnswerKeyPublished !== false ? '#00e676' : '#ff5252'};">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              ${t.isAnswerKeyPublished !== false 
+                                ? '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>' 
+                                : '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'}
+                            </svg>
+                            Answer Key: ${t.isAnswerKeyPublished !== false ? 'Enabled' : 'Restricted'}
+                          </span>
+                          <label class="toggle-switch tooltip tooltip--top" data-tooltip="${t.isAnswerKeyPublished !== false ? 'Click to Restrict Answer Key Download' : 'Click to Enable Answer Key Download'}">
+                            <input type="checkbox" ${t.isAnswerKeyPublished !== false ? 'checked' : ''} onchange="AdminDashboard.toggleAnswerKey('${t._id}', this.checked)">
+                            <span class="toggle-slider"></span>
+                          </label>
+                        </div>
                       </div>
                       
                       <div class="test-card__footer">
@@ -1660,6 +1737,23 @@ const AdminDashboard = {
         }
     },
 
+    async toggleAnswerKey(examId, isChecked) {
+        try {
+            const res = await fetch(`/api/admin/exams/${examId}/toggle-answer-key`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ isAnswerKeyPublished: isChecked })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to update answer key access');
+            notify(data.message || (isChecked ? 'Answer key published' : 'Answer key restricted'), isChecked ? 'success' : 'info');
+            this.renderTestsList();
+        } catch (err) {
+            notify(err.message, 'error');
+            this.renderTestsList();
+        }
+    },
+
     openEditTestModal(id) {
         const exam = window.allTests.find(t => t._id === id);
         if (!exam) return;
@@ -1677,6 +1771,9 @@ const AdminDashboard = {
         document.getElementById('tTitle').value = exam.title;
         document.getElementById('tStartTime').value = fmt(exam.startTime);
         document.getElementById('tEndTime').value = fmt(exam.endTime);
+        if (document.getElementById('tAnswerKeyToggle')) {
+            document.getElementById('tAnswerKeyToggle').checked = exam.isAnswerKeyPublished !== false;
+        }
         if (currentAdmin.role === 'main' && document.getElementById('tCollege')) {
             document.getElementById('tCollege').value = exam.collegeId ? exam.collegeId._id || exam.collegeId : '';
         }

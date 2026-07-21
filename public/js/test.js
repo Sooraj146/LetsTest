@@ -79,6 +79,96 @@
     answers = savedAnswers;
   }
 
+  // ── Canvas Graphic Text Renderer (Prevents DOM Text Copying) ──
+  function drawTextCanvas(text, options = {}) {
+    const {
+      prefix = '',
+      fontSize = 18,
+      fontFamily = "'Outfit', 'Inter', system-ui, sans-serif",
+      color = '#f8fafc',
+      prefixColor = '#00e5ff',
+      lineHeight = 28,
+      maxWidth = 600
+    } = options;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    const calcWidth = Math.max(200, maxWidth);
+    ctx.font = `600 ${fontSize}px ${fontFamily}`;
+
+    const fullText = (prefix ? `${prefix} ` : '') + text;
+    const words = fullText.split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    words.forEach(word => {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > calcWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+
+    const totalHeight = Math.max(26, lines.length * lineHeight + 8);
+
+    canvas.width = Math.ceil(calcWidth * dpr);
+    canvas.height = Math.ceil(totalHeight * dpr);
+    canvas.style.width = `${calcWidth}px`;
+    canvas.style.height = `${totalHeight}px`;
+    canvas.style.maxWidth = '100%';
+    canvas.style.display = 'block';
+    canvas.style.pointerEvents = 'none';
+
+    ctx.scale(dpr, dpr);
+    ctx.font = `600 ${fontSize}px ${fontFamily}`;
+    ctx.textBaseline = 'top';
+
+    lines.forEach((line, idx) => {
+      const y = idx * lineHeight + 4;
+      if (idx === 0 && prefix && line.startsWith(prefix)) {
+        ctx.fillStyle = prefixColor;
+        ctx.fillText(prefix, 0, y);
+        const prefixW = ctx.measureText(`${prefix} `).width;
+        ctx.fillStyle = color;
+        ctx.fillText(line.slice(prefix.length + 1), prefixW, y);
+      } else {
+        ctx.fillStyle = color;
+        ctx.fillText(line, 0, y);
+      }
+    });
+
+    return canvas;
+  }
+
+  // ── Anti-Copy & Anti-Inspection Security Event Guards ──
+  ['contextmenu', 'copy', 'cut', 'paste', 'dragstart', 'selectstart'].forEach(evt => {
+    document.addEventListener(evt, e => {
+      e.preventDefault();
+      LetsTest.toast('Question content copying is restricted for exam security.', 'error');
+      return false;
+    });
+  });
+
+  document.addEventListener('keydown', e => {
+    const isCtrl = e.ctrlKey || e.metaKey;
+    const key = e.key ? e.key.toLowerCase() : '';
+    if (
+      (isCtrl && ['c', 'x', 'a', 'u', 's', 'p'].includes(key)) ||
+      (isCtrl && e.shiftKey && ['i', 'j', 'c'].includes(key)) ||
+      e.key === 'F12'
+    ) {
+      e.preventDefault();
+      LetsTest.toast('Keyboard shortcuts are restricted during the examination.', 'error');
+      return false;
+    }
+  });
+
   // Timer state
   let totalSeconds = Math.max(0, Math.floor((new Date(examDetails.endTime).getTime() - Date.now()) / 1000));
   let timerInterval = null;
@@ -199,17 +289,32 @@
       textEl.style.opacity = '0';
       textEl.style.transform = 'translateX(20px)';
       setTimeout(() => {
-        // Show prefix only when there is text
+        textEl.innerHTML = '';
         const hasText = !!(q.questionText && q.questionText.trim());
-        const textHtml = hasText
-          ? `<span class="question-prefix">Q${currentIndex + 1}.</span> ${q.questionText}`
-          : `<span class="question-prefix" style="opacity:0.4;">Q${currentIndex + 1}.</span>`;
-        const imgHtml = q.questionImage
-          ? `<div class="question-media-wrapper">
-               <img src="${q.questionImage}" class="question-media zoomable" alt="Question image" onclick="openExamLightbox('${q.questionImage}')" title="Click to enlarge" />
-             </div>`
-          : '';
-        textEl.innerHTML = textHtml + imgHtml;
+        if (hasText) {
+          const availWidth = Math.max(280, textEl.clientWidth - 56 || 650);
+          const canvasObj = drawTextCanvas(q.questionText, {
+            prefix: `Q${currentIndex + 1}.`,
+            fontSize: 19,
+            lineHeight: 30,
+            maxWidth: availWidth
+          });
+          textEl.appendChild(canvasObj);
+        } else {
+          const prefixSpan = document.createElement('span');
+          prefixSpan.className = 'question-prefix';
+          prefixSpan.style.opacity = '0.4';
+          prefixSpan.textContent = `Q${currentIndex + 1}.`;
+          textEl.appendChild(prefixSpan);
+        }
+
+        if (q.questionImage) {
+          const imgWrapper = document.createElement('div');
+          imgWrapper.className = 'question-media-wrapper';
+          imgWrapper.innerHTML = `<img src="${q.questionImage}" class="question-media zoomable" alt="Question image" onclick="openExamLightbox('${q.questionImage}')" title="Click to enlarge" />`;
+          textEl.appendChild(imgWrapper);
+        }
+
         textEl.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
         textEl.style.opacity = '1';
         textEl.style.transform = 'translateX(0)';
@@ -238,20 +343,37 @@
       const hasText = !!optText.trim();
       const hasImg  = !!optImg;
 
-      // Mark image-only options so CSS can style them differently
       if (!hasText && hasImg) item.classList.add('option-item--img-only');
 
-      const optImgHtml = hasImg
-        ? `<img src="${optImg}" class="option-media zoomable" alt="Option ${idx + 1} image" onclick="openExamLightbox('${optImg}')" title="Click to enlarge" />`
-        : '';
+      const markerDiv = document.createElement('div');
+      markerDiv.className = 'option-marker';
+      markerDiv.textContent = markers[idx] || (idx + 1);
 
-      item.innerHTML = `
-        <div class="option-marker">${markers[idx] || (idx + 1)}</div>
-        <div class="option-content">
-          ${hasText ? `<div class="option-text">${optText}</div>` : ''}
-          ${optImgHtml}
-        </div>
-      `;
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'option-content';
+
+      if (hasText) {
+        const optTextDiv = document.createElement('div');
+        optTextDiv.className = 'option-text';
+        const availOptW = Math.max(220, (optionsList.clientWidth - 100) || 550);
+        const optCanvas = drawTextCanvas(optText, {
+          fontSize: 16,
+          lineHeight: 24,
+          maxWidth: availOptW,
+          color: '#f1f5f9'
+        });
+        optTextDiv.appendChild(optCanvas);
+        contentDiv.appendChild(optTextDiv);
+      }
+
+      if (hasImg) {
+        const optImgWrapper = document.createElement('div');
+        optImgWrapper.innerHTML = `<img src="${optImg}" class="option-media zoomable" alt="Option ${idx + 1} image" onclick="openExamLightbox('${optImg}')" title="Click to enlarge" />`;
+        contentDiv.appendChild(optImgWrapper);
+      }
+
+      item.appendChild(markerDiv);
+      item.appendChild(contentDiv);
 
       item.addEventListener('click', () => selectOption(idx, originalIdx));
       optionsList.appendChild(item);
@@ -311,6 +433,7 @@
   function goToQuestion(index) {
     if (index < 0 || index >= totalQuestions) return;
     currentIndex = index;
+    closeMobilePanel();
     renderQuestion();
   }
 
@@ -555,12 +678,40 @@
   });
 
   // ── Toggle Side Panel (mobile) ─────────────────────────
+  function openMobilePanel() {
+    const panel = document.getElementById('sidePanel');
+    const backdrop = document.getElementById('sidePanelBackdrop');
+    if (panel) panel.classList.add('open');
+    if (backdrop) backdrop.classList.add('active');
+  }
+
+  function closeMobilePanel() {
+    const panel = document.getElementById('sidePanel');
+    const backdrop = document.getElementById('sidePanelBackdrop');
+    if (panel) panel.classList.remove('open');
+    if (backdrop) backdrop.classList.remove('active');
+  }
+
   const togglePanelBtn = document.getElementById('togglePanel');
   if (togglePanelBtn) {
     togglePanelBtn.addEventListener('click', () => {
       const panel = document.getElementById('sidePanel');
-      if (panel) panel.classList.toggle('open');
+      if (panel && panel.classList.contains('open')) {
+        closeMobilePanel();
+      } else {
+        openMobilePanel();
+      }
     });
+  }
+
+  const closeSidePanelBtn = document.getElementById('closeSidePanel');
+  if (closeSidePanelBtn) {
+    closeSidePanelBtn.addEventListener('click', closeMobilePanel);
+  }
+
+  const backdropEl = document.getElementById('sidePanelBackdrop');
+  if (backdropEl) {
+    backdropEl.addEventListener('click', closeMobilePanel);
   }
 
   // ── Keyboard navigation ────────────────────────────────

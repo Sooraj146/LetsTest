@@ -26,6 +26,10 @@ const examSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  isAnswerKeyPublished: {
+    type: Boolean,
+    default: true,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Exam', examSchema);
