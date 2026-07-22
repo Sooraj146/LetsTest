@@ -6,6 +6,10 @@
   <meta name="description" content="NexusTest Control Deck – Advanced administrative dashboard. Command tests, colleges, and students.">
   <title>Let's Test — Admin Control Deck</title>
   
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Satisfy&family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/login.css">
   <link rel="stylesheet" href="css/admin.css">
@@ -133,7 +137,7 @@
         <div class="sidebar-logo">
           <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
         </div>
-        <span class="sidebar-title">LET'S TEST</span>
+        <span class="sidebar-title">Let's Test</span>
       </div>
 
       <nav class="sidebar-menu" id="sidebarMenu">
@@ -794,13 +798,17 @@
         </div>
         <div class="modal-form-grid">
           <div class="input-group">
-            <label for="tStartTime">Activation Time</label>
+            <label for="tStartTime">Login Window Start</label>
             <input type="datetime-local" class="input-field" id="tStartTime">
           </div>
           <div class="input-group">
-            <label for="tEndTime">Expiry Deadline</label>
+            <label for="tEndTime">Login Window End</label>
             <input type="datetime-local" class="input-field" id="tEndTime">
           </div>
+        </div>
+        <div class="input-group" style="margin-top: 14px;">
+          <label for="tDuration">Test Duration (Minutes)</label>
+          <input type="number" class="input-field" id="tDuration" min="1" value="60" placeholder="e.g. 60" required>
         </div>
         <div class="input-group" id="tCollegeWrapper">
           <label for="tCollege">Institution Entity</label>

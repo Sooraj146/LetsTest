@@ -131,9 +131,7 @@
   }
 
   function getDuration(exam) {
-    if (!exam.startTime || !exam.endTime) return '—';
-    const diff = Math.round((new Date(exam.endTime) - new Date(exam.startTime)) / 60000);
-    return diff > 0 ? `${diff} min` : '—';
+    return exam.duration ? `${exam.duration} min` : '60 min';
   }
 
   function createTestCard(test, index) {
@@ -174,7 +172,7 @@
     if (test.status === 'upcoming') {
       countdownHTML = `<div class="upcoming-countdown-timer" data-start-time="${test.startTime}" style="font-size:0.75rem; color:var(--accent-purple); font-weight:700; margin-top:4px;">STARTS IN: --:--:--</div>`;
     } else if (test.status === 'live' && test.endTime) {
-      liveCountdownHTML = `<span class="live-ends-countdown" data-end-time="${test.endTime}" style="font-size:0.78rem; font-family:var(--font-body); color:var(--accent-red); font-weight:700; text-shadow:0 0 8px rgba(255, 23, 68, 0.25);">ENDS IN: --:--:--</span>`;
+      liveCountdownHTML = `<span class="live-ends-countdown" data-end-time="${test.endTime}" style="font-size:0.78rem; font-family:var(--font-body); color:var(--accent-red); font-weight:700; text-shadow:0 0 8px rgba(255, 23, 68, 0.25);">LOGIN CLOSES IN: --:--:--</span>`;
     }
 
     const sectionsList = test.sections || [];
@@ -537,7 +535,7 @@
         const diff = endTime - now;
 
         if (diff <= 0) {
-          el.innerHTML = 'ENDED';
+          el.innerHTML = 'LOGIN CLOSED';
           refreshNeeded = true;
         } else {
           const hrs = Math.floor(diff / 3600000);
@@ -545,7 +543,7 @@
           const secs = Math.floor((diff % 60000) / 1000);
           
           const pad = (n) => String(n).padStart(2, '0');
-          el.innerHTML = `ENDS IN: ${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+          el.innerHTML = `LOGIN CLOSES IN: ${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
         }
       });
 

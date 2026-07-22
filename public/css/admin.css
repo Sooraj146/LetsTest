@@ -4,56 +4,114 @@
    ============================================================ */
 
 @import 'styles.css';
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Dancing+Script:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Satisfy&family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
-/* ── Premium Modern Dark Slate & Indigo Theme Variables ───────────────────── */
+/* ── Premium Modern Dark Slate & Electric Neon Theme Variables ───────────────────── */
 :root {
-  /* Core Dark Slate / Zinc Palette */
-  --bg-primary: #09090b;        /* Zinc 950 ( Obsidian Dark ) */
-  --bg-secondary: #18181b;      /* Zinc 900 */
-  --bg-tertiary: #27272a;       /* Zinc 800 */
-  --bg-card: rgba(24, 24, 27, 0.7);   /* Frosted Zinc 900 */
-  --bg-card-hover: rgba(39, 39, 42, 0.85); /* Frosted Zinc 800 */
-  --bg-glass: rgba(15, 15, 18, 0.75);
-  --bg-glass-strong: rgba(9, 9, 11, 0.95);
+  /* Core Dark Obsidian & Midnight Palette */
+  --bg-primary: #070810;        /* Deep Obsidian Midnight */
+  --bg-secondary: #0f1122;      /* Dark Slate Blue */
+  --bg-tertiary: #171932;       /* Slate Translucent */
+  --bg-card: rgba(16, 18, 34, 0.72);   /* Frosted Midnight Glass */
+  --bg-card-hover: rgba(24, 27, 50, 0.88); /* Frosted Slate Hover */
+  --bg-glass: rgba(14, 16, 30, 0.75);
+  --bg-glass-strong: rgba(9, 10, 20, 0.95);
 
-  /* Curated Indigo & Cool Gray Accents */
-  --accent-cyan: #6366f1;       /* Indigo primary accent */
-  --accent-blue: #3b82f6;       /* Cobalt Blue */
-  --accent-purple: #8b5cf6;     /* Violet */
-  --accent-pink: #ec4899;       /* Pink */
-  --accent-green: #10b981;      /* Emerald Green (Success) */
-  --accent-orange: #f59e0b;     /* Amber (Warning) */
-  --accent-red: #ef4444;        /* Rose Red (Danger) */
-  --accent-yellow: #f59e0b;     /* Warning yellow */
+  /* Curated Electric Neon Accents */
+  --accent-cyan: #00e5ff;       /* Electric Cyan */
+  --accent-blue: #2979ff;       /* Cobalt Blue */
+  --accent-purple: #7c4dff;     /* Violet */
+  --accent-pink: #ff4081;       /* Neon Pink */
+  --accent-green: #00e676;      /* Emerald Green */
+  --accent-orange: #ff9100;     /* Amber Gold */
+  --accent-red: #ff1744;        /* Crimson Red */
+  --accent-yellow: #ffd600;     /* Warning Yellow */
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #3b82f6 50%, #8b5cf6 100%);
-  --gradient-cyan-blue: linear-gradient(135deg, #6366f1, #3b82f6);
-  --gradient-purple-pink: linear-gradient(135deg, #8b5cf6, #ec4899);
-  --gradient-danger: linear-gradient(135deg, #ef4444, #dc2626);
+  --gradient-primary: linear-gradient(135deg, #00e5ff 0%, #7c4dff 50%, #ff4081 100%);
+  --gradient-cyan-blue: linear-gradient(135deg, #00e5ff 0%, #2979ff 100%);
+  --gradient-purple-pink: linear-gradient(135deg, #7c4dff 0%, #ff4081 100%);
+  --gradient-green: linear-gradient(135deg, #00e676 0%, #00bfa5 100%);
+  --gradient-orange: linear-gradient(135deg, #ff9100 0%, #ff6d00 100%);
+  --gradient-danger: linear-gradient(135deg, #ff1744 0%, #d50000 100%);
 
   /* Borders & Shadows */
-  --border-glow: rgba(99, 102, 241, 0.15);
-  --border-glow-strong: rgba(99, 102, 241, 0.35);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 16px 50px rgba(0, 0, 0, 0.7);
-  --shadow-glow-cyan: 0 0 20px rgba(99, 102, 241, 0.15);
-  --shadow-glow-purple: 0 0 20px rgba(139, 92, 246, 0.15);
+  --border-glow: rgba(0, 229, 255, 0.2);
+  --border-glow-strong: rgba(0, 229, 255, 0.4);
+  --border-subtle: rgba(255, 255, 255, 0.09);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 10px 36px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 18px 60px rgba(0, 0, 0, 0.8);
+  --shadow-glow-cyan: 0 0 25px rgba(0, 229, 255, 0.2);
+  --shadow-glow-purple: 0 0 25px rgba(124, 77, 255, 0.2);
 
   /* High-legibility text elements */
-  --text-primary: #f4f4f5;      /* Zinc 100 */
-  --text-secondary: #a1a1aa;    /* Zinc 400 */
-  --text-muted: #71717a;        /* Zinc 500 */
-  --text-accent: #6366f1;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-accent: #00e5ff;
 
-  /* Font overrides - PROFESSIONAL SANS SERIF */
+  /* Font overrides */
   --font-heading: 'Outfit', 'Inter', sans-serif;
   --font-body: 'Inter', sans-serif;
-  --font-cursive: 'Outfit', sans-serif;
+  --font-cursive: 'Satisfy', 'Caveat', cursive;
   --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* ── Cursive Typography Rules (Admin UI Only) ──────────────── */
+.sidebar-title,
+.login-title,
+.admin-topbar__title,
+.panel-header__info h2,
+.chart-card__title,
+.modal-header h3,
+#addTestModalTitle,
+#addStudentModalTitle,
+#confirmTitle,
+.sam-section-title,
+.admin-cursive-accent {
+  font-family: var(--font-cursive) !important;
+  letter-spacing: 0.03em !important;
+}
+
+/* Ensure Student Name in Analysis is in normal sans-serif font for maximum legibility */
+#saName,
+.sam-header-title {
+  font-family: var(--font-heading) !important;
+  font-weight: 800 !important;
+  font-size: 1.35rem !important;
+  color: #ffffff !important;
+  letter-spacing: 0.01em !important;
+}
+
+.sidebar-title {
+  font-size: 1.65rem !important;
+  font-weight: 700 !important;
+  background: var(--gradient-primary) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.admin-topbar__title {
+  font-size: 1.65rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.3) !important;
+}
+
+.panel-header__info h2 {
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  margin-bottom: 4px !important;
+}
+
+.login-title {
+  font-size: 2.8rem !important;
+  font-weight: 700 !important;
+  background: var(--gradient-primary) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
 }
 
 /* Override neon text to glow red for admin */
@@ -2482,19 +2540,21 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .test-card {
-  padding: 24px !important;
-  border-radius: var(--radius-lg) !important;
+  padding: 22px !important;
+  border-radius: 16px !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
   height: auto !important;
-  min-height: 315px !important;
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  background: linear-gradient(135deg, rgba(14, 14, 28, 0.9) 0%, rgba(6, 6, 12, 0.95) 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  min-height: 330px !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  background: linear-gradient(145deg, rgba(20, 24, 46, 0.78), rgba(10, 12, 26, 0.88)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(20px) !important;
   position: relative !important;
   overflow: hidden !important;
-  gap: 16px !important;
+  gap: 14px !important;
 }
 
 .test-card::before {
@@ -2505,13 +2565,75 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   height: 3px;
   background: var(--gradient-primary);
-  opacity: 0.8;
+  opacity: 0.9;
+  transition: height 0.3s ease, opacity 0.3s ease;
+}
+
+.test-card.status-live::before {
+  background: linear-gradient(90deg, #ff1744, #ff4081, #ff1744);
+  box-shadow: 0 0 12px rgba(255, 23, 68, 0.6);
+}
+
+.test-card.status-live {
+  border-color: rgba(255, 23, 68, 0.35) !important;
+}
+
+.test-card.status-completed::before {
+  background: linear-gradient(90deg, #00e676, #00bfa5);
 }
 
 .test-card:hover {
-  transform: translateY(-5px) !important;
-  border-color: rgba(255, 51, 68, 0.35) !important;
-  box-shadow: 0 12px 30px rgba(255, 51, 68, 0.15), 0 0 1px rgba(255, 51, 68, 0.5) !important;
+  transform: translateY(-6px) scale(1.015) !important;
+  border-color: rgba(0, 229, 255, 0.35) !important;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 229, 255, 0.15) !important;
+}
+
+.test-card:hover::before {
+  height: 4px;
+  opacity: 1;
+}
+
+/* Metadata Chips in Test Card */
+.test-card__meta-chips {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 8px !important;
+  margin: 4px 0 !important;
+}
+
+.test-card__meta-chip {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 8px !important;
+  padding: 8px 6px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  text-align: center !important;
+  transition: all 0.2s ease !important;
+}
+
+.test-card__meta-chip:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(0, 229, 255, 0.2) !important;
+  transform: translateY(-1px) !important;
+}
+
+.test-card__meta-chip-val {
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  color: #f8fafc !important;
+  font-family: var(--font-heading) !important;
+}
+
+.test-card__meta-chip-lbl {
+  font-size: 0.62rem !important;
+  font-weight: 600 !important;
+  color: var(--text-muted) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
 }
 
 .test-card__header {

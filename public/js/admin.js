@@ -447,6 +447,7 @@ const AdminDashboard = {
                 const title = document.getElementById('tTitle').value.trim();
                 const startTime = document.getElementById('tStartTime').value ? new Date(document.getElementById('tStartTime').value).toISOString() : null;
                 const endTime = document.getElementById('tEndTime').value ? new Date(document.getElementById('tEndTime').value).toISOString() : null;
+                const duration = document.getElementById('tDuration') ? parseInt(document.getElementById('tDuration').value, 10) : 60;
                 const collegeId = currentAdmin.role === 'mini' ? selectedCollegeId : document.getElementById('tCollege').value;
                 const isAnswerKeyPublished = document.getElementById('tAnswerKeyToggle') ? document.getElementById('tAnswerKeyToggle').checked : true;
 
@@ -458,7 +459,7 @@ const AdminDashboard = {
                     const res = await fetch(url, {
                         method,
                         headers: getAuthHeaders(),
-                        body: JSON.stringify({ title, startTime, endTime, collegeId, isAnswerKeyPublished })
+                        body: JSON.stringify({ title, startTime, endTime, duration, collegeId, isAnswerKeyPublished })
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.message || 'Error processing exam');
@@ -736,10 +737,10 @@ const AdminDashboard = {
                 const timeStr = `${pad(hoursLeft)}:${pad(minsLeft)}:${pad(secsLeft)}`;
 
                 // Format duration
-                const durationMs = end - start;
-                const durationHrs = Math.floor(durationMs / (60 * 60 * 1000));
-                const durationMins = Math.round((durationMs % (60 * 60 * 1000)) / (60 * 1000));
-                const durationStr = `${durationHrs}h ${durationMins}m`;
+                const durationMinutes = exam.duration || 60;
+                const dHrs = Math.floor(durationMinutes / 60);
+                const dMins = durationMinutes % 60;
+                const durationStr = dHrs > 0 ? `${dHrs}h ${dMins}m` : `${dMins}m`;
 
                 activeItems.push(`
                     <div class="live-ticker-item upcoming-alert">
@@ -1659,8 +1660,8 @@ const AdminDashboard = {
                       <div class="test-card__header">
                         <div class="test-card__title-section">
                           <strong class="test-card__name" title="${t.title}">${t.title}</strong>
-                          <div class="test-card__status-badge" style="color: ${statusColor}; background: ${statusBg}; border: 1px solid ${statusColor}30;">
-                            ${statusText}
+                          <div class="test-card__status-badge" style="color: ${statusColor}; background: ${statusBg}; border: 1px solid ${statusColor}40; box-shadow: 0 0 10px ${statusColor}20;">
+                            ${statusText === 'Live' ? '<span class="status-live-pulse" style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#ff1744; margin-right:5px; box-shadow:0 0 8px #ff1744;"></span>' : ''}${statusText}
                           </div>
                         </div>
                         <div class="test-card__actions">
@@ -1674,36 +1675,44 @@ const AdminDashboard = {
                       </div>
                       
                       <div class="test-card__body">
-                        <div class="test-card__time-row">
-                          <div class="test-card__time-item">
-                            <span class="test-card__time-label">Starts</span>
-                            <span class="test-card__time-value">${startStr}</span>
+                        <div class="test-card__time-row" style="background: rgba(8,10,22,0.65); border: 1px solid rgba(255,255,255,0.08); padding: 11px 14px; border-radius: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; gap: 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
+                          <div class="test-card__time-item" style="display: flex; flex-direction: column; gap: 3px;">
+                            <span class="test-card__time-label" style="display: flex; align-items: center; gap: 5px; font-size: 0.68rem; font-weight: 700; color: #00e676; letter-spacing: 0.05em; text-transform: uppercase;">
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                              Login Opens
+                            </span>
+                            <span class="test-card__time-value" style="font-size: 0.82rem; font-weight: 600; color: #f8fafc; font-family: var(--font-body);">${startStr}</span>
                           </div>
-                          <div class="test-card__time-item test-card__time-item--end">
-                            <span class="test-card__time-label">Ends</span>
-                            <span class="test-card__time-value">${endStr}</span>
-                          </div>
-                        </div>
-                        
-                        <div class="test-card__meta-row">
-                          <div class="test-card__meta-item">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-orange);"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                            <span class="test-card__meta-label">Attended:</span>
-                            <span class="test-card__meta-value">${t.studentCount ?? 0}</span>
-                          </div>
-                          <div class="test-card__meta-item">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-cyan);"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span class="test-card__meta-label">Questions:</span>
-                            <span class="test-card__meta-value">${t.questionCount ?? 0}</span>
+                          <div class="test-card__time-item test-card__time-item--end" style="display: flex; flex-direction: column; gap: 3px; text-align: right;">
+                            <span class="test-card__time-label" style="display: flex; align-items: center; gap: 5px; justify-content: flex-end; font-size: 0.68rem; font-weight: 700; color: #ff5252; letter-spacing: 0.05em; text-transform: uppercase;">
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                              Login Closes
+                            </span>
+                            <span class="test-card__time-value" style="font-size: 0.82rem; font-weight: 600; color: #f8fafc; font-family: var(--font-body);">${endStr}</span>
                           </div>
                         </div>
                         
-                        <div class="test-card__sections-row">
+                        <div class="test-card__meta-chips">
+                          <div class="test-card__meta-chip">
+                            <span class="test-card__meta-chip-val" style="color: var(--accent-purple);">${t.duration || 60}m</span>
+                            <span class="test-card__meta-chip-lbl">Duration</span>
+                          </div>
+                          <div class="test-card__meta-chip">
+                            <span class="test-card__meta-chip-val" style="color: var(--accent-orange);">${t.studentCount ?? 0}</span>
+                            <span class="test-card__meta-chip-lbl">Attended</span>
+                          </div>
+                          <div class="test-card__meta-chip">
+                            <span class="test-card__meta-chip-val" style="color: var(--accent-cyan);">${t.questionCount ?? 0}</span>
+                            <span class="test-card__meta-chip-lbl">Questions</span>
+                          </div>
+                        </div>
+                        
+                        <div class="test-card__sections-row" style="margin-top: 4px;">
                           ${sectionsHtml}
                         </div>
 
                         <div class="test-card__ak-row">
-                          <span class="test-card__ak-label" style="color: ${t.isAnswerKeyPublished !== false ? '#00e676' : '#ff5252'};">
+                          <span class="test-card__ak-label" style="color: ${t.isAnswerKeyPublished !== false ? '#00e676' : '#ff5252'}; font-weight: 600;">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                               ${t.isAnswerKeyPublished !== false 
                                 ? '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>' 
@@ -1771,6 +1780,9 @@ const AdminDashboard = {
         document.getElementById('tTitle').value = exam.title;
         document.getElementById('tStartTime').value = fmt(exam.startTime);
         document.getElementById('tEndTime').value = fmt(exam.endTime);
+        if (document.getElementById('tDuration')) {
+            document.getElementById('tDuration').value = exam.duration || 60;
+        }
         if (document.getElementById('tAnswerKeyToggle')) {
             document.getElementById('tAnswerKeyToggle').checked = exam.isAnswerKeyPublished !== false;
         }
@@ -2945,7 +2957,7 @@ function showDashboard() {
 }
 
 function formatDuration(ms) {
-    if (!ms || isNaN(ms) || ms <= 0) return '0s';
+    if (!ms || isNaN(ms) || ms <= 0) return '—';
     const totalSecs = Math.floor(ms / 1000);
     const hours = Math.floor(totalSecs / 3600);
     const minutes = Math.floor((totalSecs % 3600) / 60);

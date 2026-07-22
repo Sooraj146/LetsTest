@@ -1,10 +1,14 @@
 const mongoose = require('mongoose');
-const dns = require('dns');
 
-// Fix for Windows systems where the default DNS server fails to resolve
-// MongoDB Atlas SRV records, causing ECONNREFUSED errors.
-// Forces Node.js to use Google's reliable public DNS servers.
-dns.setServers(['8.8.8.8', '8.8.4.4']);
+// Fix for Windows local systems where default DNS fails to resolve MongoDB Atlas SRV records.
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    const dns = require('dns');
+    dns.setServers(['8.8.8.8', '8.8.4.4']);
+  } catch (e) {
+    console.warn('Custom DNS override failed, using default system DNS');
+  }
+}
 
 const connectDB = async () => {
   try {

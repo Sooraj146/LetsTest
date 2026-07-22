@@ -155,16 +155,29 @@ exports.registerUser = async (req, res) => {
       Question.find({ examId }).select('-correctAnswer').lean()
     ]);
 
+    const now = new Date();
+    if (exam.startTime && now < exam.startTime) {
+      return res.status(400).json({ message: 'Exam login window has not opened yet' });
+    }
+    if (!byRoll && exam.endTime && now > exam.endTime) {
+      return res.status(400).json({ message: 'Exam login window has closed' });
+    }
+
     const examDetails = {
       title:     exam.title,
       startTime: exam.startTime,
       endTime:   exam.endTime,
+      duration:  exam.duration || 60,
     };
 
     // If already registered, resume test
     if (byRoll) {
       if (byRoll.isSubmitted) {
         return res.status(400).json({ message: 'This roll number has already submitted this exam' });
+      }
+      if (!byRoll.startedAt) {
+        byRoll.startedAt = new Date();
+        await byRoll.save();
       }
       return res.status(200).json({
         _id:        byRoll._id,
@@ -173,6 +186,7 @@ exports.registerUser = async (req, res) => {
         email:      byRoll.email,
         examId:     byRoll.examId,
         isSubmitted: byRoll.isSubmitted,
+        startedAt:  byRoll.startedAt,
         message:    'Resuming test',
         examDetails,
         questions,
@@ -204,6 +218,7 @@ exports.registerUser = async (req, res) => {
       email:      user.email,
       examId:     user.examId,
       isSubmitted: user.isSubmitted,
+      startedAt:  user.startedAt,
       examDetails,
       questions,
     });
@@ -254,6 +269,9 @@ exports.submitTest = async (req, res) => {
     user.sectionScores = sectionScores;
     user.totalScore    = totalScore;
     user.isSubmitted   = true;
+    if (!user.startedAt) {
+      user.startedAt = user.createdAt || new Date();
+    }
     user.submittedAt   = new Date();
     await user.save();
 

@@ -54,8 +54,9 @@ exports.getStudents = async (req, res) => {
       isSubmitted: true,
       examId: { $in: activeExamIds }
     };
-    if (collegeId) {
-      submissionsQuery.collegeId = require('mongoose').Types.ObjectId.createFromHexString(collegeId.toString());
+    const mongoose = require('mongoose');
+    if (collegeId && mongoose.isValidObjectId(collegeId.toString())) {
+      submissionsQuery.collegeId = new mongoose.Types.ObjectId(collegeId.toString());
     }
     const submissions = await User.find(submissionsQuery);
 
@@ -237,18 +238,34 @@ exports.getLeaderboard = async (req, res) => {
       .sort({ totalScore: -1 });
 
     const leaderboard = users.map((u, i) => {
-      const start = u.startedAt || u.createdAt;
-      const end = u.submittedAt || u.updatedAt;
+      let durationMs = 0;
+
+      if (u.startedAt && u.submittedAt) {
+        // Primary: use explicit session timestamps (available for recent records)
+        durationMs = new Date(u.submittedAt).getTime() - new Date(u.startedAt).getTime();
+      } else if (u.createdAt && u.updatedAt) {
+        // Fallback: use mongoose record timestamps for older records that
+        // predate startedAt/submittedAt — but only if updatedAt is within
+        // 3 hours of createdAt, to avoid picking up later bulk operations.
+        const fallbackMs = new Date(u.updatedAt).getTime() - new Date(u.createdAt).getTime();
+        const THREE_HOURS = 3 * 60 * 60 * 1000;
+        if (fallbackMs > 0 && fallbackMs <= THREE_HOURS) {
+          durationMs = fallbackMs;
+        }
+      }
+
+      if (durationMs < 0) durationMs = 0;
+
       return {
         rank:          i + 1,
         name:          u.name,
         rollNumber:    u.rollNumber,
         email:         u.email,
         totalScore:    u.totalScore,
-        sectionScores: Object.fromEntries(u.sectionScores),
-        startedAt:     start,
-        submittedAt:   end,
-        durationMs:    end && start ? (new Date(end).getTime() - new Date(start).getTime()) : 0
+        sectionScores: u.sectionScores instanceof Map ? Object.fromEntries(u.sectionScores) : (u.sectionScores || {}),
+        startedAt:     u.startedAt || u.createdAt,
+        submittedAt:   u.submittedAt || u.updatedAt,
+        durationMs
       };
     });
 

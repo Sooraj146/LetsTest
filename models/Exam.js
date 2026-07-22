@@ -20,6 +20,11 @@ const examSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  duration: {
+    type: Number,
+    default: 60,
+    min: 1,
+  },
   collegeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'College',

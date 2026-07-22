@@ -1,6 +1,20 @@
-// Force Google public DNS for reliable SRV resolution on all platforms
-const dns = require('dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
+// Process-level unhandled rejection & exception safeguards
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception thrown:', err);
+});
+
+// Force Google public DNS for reliable SRV resolution on non-production systems
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    const dns = require('dns');
+    dns.setServers(['8.8.8.8', '8.8.4.4']);
+  } catch (e) {
+    console.warn('Custom DNS override failed, using default system DNS');
+  }
+}
 
 const express = require('express');
 const dotenv = require('dotenv');

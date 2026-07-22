@@ -14,7 +14,7 @@ function getCollegeId(req) {
 // @route POST /api/admin/exams
 exports.createExam = async (req, res) => {
   try {
-    const { title, startTime, endTime, collegeId, isAnswerKeyPublished } = req.body;
+    const { title, startTime, endTime, duration, collegeId, isAnswerKeyPublished } = req.body;
     
     // Determine target college
     let targetCollege = collegeId;
@@ -30,11 +30,14 @@ exports.createExam = async (req, res) => {
       return res.status(400).json({ message: 'End time must be after start time' });
     }
 
+    const parsedDuration = parseInt(duration, 10);
+
     const exam = await Exam.create({
       title,
       collegeId: targetCollege,
       startTime: startTime || null,
       endTime:   endTime   || null,
+      duration:  (!isNaN(parsedDuration) && parsedDuration > 0) ? parsedDuration : 60,
       isAnswerKeyPublished: typeof isAnswerKeyPublished === 'boolean' ? isAnswerKeyPublished : true,
     });
 
@@ -50,7 +53,7 @@ exports.createExam = async (req, res) => {
 // @route PUT /api/admin/exams/:id
 exports.updateExam = async (req, res) => {
   try {
-    const { title, startTime, endTime, collegeId, isAnswerKeyPublished } = req.body;
+    const { title, startTime, endTime, duration, collegeId, isAnswerKeyPublished } = req.body;
     if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
       return res.status(400).json({ message: 'End time must be after start time' });
     }
@@ -59,6 +62,12 @@ exports.updateExam = async (req, res) => {
       startTime: startTime || null,
       endTime:   endTime   || null,
     };
+    if (duration !== undefined && duration !== null) {
+      const parsedDuration = parseInt(duration, 10);
+      if (!isNaN(parsedDuration) && parsedDuration > 0) {
+        updateData.duration = parsedDuration;
+      }
+    }
     if (title) updateData.title = title;
     if (typeof isAnswerKeyPublished === 'boolean') {
       updateData.isAnswerKeyPublished = isAnswerKeyPublished;

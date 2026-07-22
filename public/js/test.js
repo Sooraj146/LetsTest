@@ -169,8 +169,11 @@
     }
   });
 
-  // Timer state
-  let totalSeconds = Math.max(0, Math.floor((new Date(examDetails.endTime).getTime() - Date.now()) / 1000));
+  // Timer state based on candidate's fixed exam duration
+  const durationMinutes = Number(examDetails.duration) || 60;
+  const startMs = user.startedAt ? new Date(user.startedAt).getTime() : Date.now();
+  const candidateEndMs = startMs + (durationMinutes * 60 * 1000);
+  let totalSeconds = Math.max(0, Math.floor((candidateEndMs - Date.now()) / 1000));
   let timerInterval = null;
 
   // Populate Test Info
