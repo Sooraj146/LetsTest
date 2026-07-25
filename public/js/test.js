@@ -84,7 +84,7 @@
     const {
       prefix = '',
       fontSize = 18,
-      fontFamily = "'Outfit', 'Inter', system-ui, sans-serif",
+      fontFamily = "'Outfit', 'Inter', system-ui, -apple-system, sans-serif",
       color = '#f8fafc',
       prefixColor = '#00e5ff',
       lineHeight = 28,
@@ -95,7 +95,10 @@
     const ctx = canvas.getContext('2d');
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    const calcWidth = Math.max(200, maxWidth);
+    const calcWidth = Math.max(200, Math.floor(maxWidth));
+    const paddingX = 4;
+    const textUsableWidth = Math.max(160, calcWidth - (paddingX * 2));
+
     ctx.font = `600 ${fontSize}px ${fontFamily}`;
 
     const fullText = (prefix ? `${prefix} ` : '') + text;
@@ -106,7 +109,7 @@
     words.forEach(word => {
       const testLine = currentLine ? `${currentLine} ${word}` : word;
       const metrics = ctx.measureText(testLine);
-      if (metrics.width > calcWidth && currentLine) {
+      if (metrics.width > textUsableWidth && currentLine) {
         lines.push(currentLine);
         currentLine = word;
       } else {
@@ -115,7 +118,7 @@
     });
     if (currentLine) lines.push(currentLine);
 
-    const totalHeight = Math.max(26, lines.length * lineHeight + 8);
+    const totalHeight = Math.max(32, lines.length * lineHeight + 16);
 
     canvas.width = Math.ceil(calcWidth * dpr);
     canvas.height = Math.ceil(totalHeight * dpr);
@@ -130,16 +133,16 @@
     ctx.textBaseline = 'top';
 
     lines.forEach((line, idx) => {
-      const y = idx * lineHeight + 4;
+      const y = idx * lineHeight + 6;
       if (idx === 0 && prefix && line.startsWith(prefix)) {
         ctx.fillStyle = prefixColor;
-        ctx.fillText(prefix, 0, y);
+        ctx.fillText(prefix, paddingX, y);
         const prefixW = ctx.measureText(`${prefix} `).width;
         ctx.fillStyle = color;
-        ctx.fillText(line.slice(prefix.length + 1), prefixW, y);
+        ctx.fillText(line.slice(prefix.length + 1), paddingX + prefixW, y);
       } else {
         ctx.fillStyle = color;
-        ctx.fillText(line, 0, y);
+        ctx.fillText(line, paddingX, y);
       }
     });
 
@@ -169,11 +172,23 @@
     }
   });
 
-  // Timer state based on candidate's fixed exam duration
+  // ── Server-Authoritative Timer State ──
   const durationMinutes = Number(examDetails.duration) || 60;
   const startMs = user.startedAt ? new Date(user.startedAt).getTime() : Date.now();
-  const candidateEndMs = startMs + (durationMinutes * 60 * 1000);
-  let totalSeconds = Math.max(0, Math.floor((candidateEndMs - Date.now()) / 1000));
+  let candidateEndMs = startMs + (durationMinutes * 60 * 1000);
+
+  if (examDetails.endTime) {
+    const globalEndMs = new Date(examDetails.endTime).getTime();
+    if (globalEndMs < candidateEndMs) {
+      candidateEndMs = globalEndMs;
+    }
+  }
+
+  function getRemainingSeconds() {
+    return Math.max(0, Math.floor((candidateEndMs - Date.now()) / 1000));
+  }
+
+  let totalSeconds = getRemainingSeconds();
   let timerInterval = null;
 
   // Populate Test Info
@@ -295,7 +310,8 @@
         textEl.innerHTML = '';
         const hasText = !!(q.questionText && q.questionText.trim());
         if (hasText) {
-          const availWidth = Math.max(280, textEl.clientWidth - 56 || 650);
+          const clientW = (textEl.clientWidth > 0 ? textEl.clientWidth : (textEl.getBoundingClientRect().width || 650));
+          const availWidth = Math.max(280, clientW - 56);
           const canvasObj = drawTextCanvas(q.questionText, {
             prefix: `Q${currentIndex + 1}.`,
             fontSize: 19,
@@ -358,7 +374,8 @@
       if (hasText) {
         const optTextDiv = document.createElement('div');
         optTextDiv.className = 'option-text';
-        const availOptW = Math.max(220, (optionsList.clientWidth - 100) || 550);
+        const optListW = (optionsList.clientWidth > 0 ? optionsList.clientWidth : (optionsList.getBoundingClientRect().width || (document.getElementById('questionPanel')?.clientWidth - 80) || 550));
+        const availOptW = Math.max(200, optListW - 90);
         const optCanvas = drawTextCanvas(optText, {
           fontSize: 16,
           lineHeight: 24,
@@ -511,8 +528,13 @@
     const timerDisplay = document.getElementById('timerDisplay');
     const timerBox = document.getElementById('timerBox');
 
+    totalSeconds = getRemainingSeconds();
+    if (timerDisplay) timerDisplay.textContent = LetsTest.formatTime(totalSeconds);
+
+    if (timerInterval) clearInterval(timerInterval);
+
     timerInterval = setInterval(() => {
-      totalSeconds--;
+      totalSeconds = getRemainingSeconds();
 
       if (totalSeconds <= 0) {
         clearInterval(timerInterval);
@@ -520,13 +542,15 @@
         return;
       }
 
-      timerDisplay.textContent = LetsTest.formatTime(totalSeconds);
+      if (timerDisplay) timerDisplay.textContent = LetsTest.formatTime(totalSeconds);
 
       // Warning states
-      if (totalSeconds <= 300) {
-        timerBox.className = 'timer timer--danger';
-      } else if (totalSeconds <= 600) {
-        timerBox.className = 'timer timer--warning';
+      if (timerBox) {
+        if (totalSeconds <= 300) {
+          timerBox.className = 'timer timer--danger';
+        } else if (totalSeconds <= 600) {
+          timerBox.className = 'timer timer--warning';
+        }
       }
     }, 1000);
   }
@@ -745,6 +769,21 @@
       e.returnValue = '';
     }
   });
+
+  // ── Responsive Resize & Font Loading Handlers ──
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      renderQuestion();
+    }, 150);
+  });
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      renderQuestion();
+    }).catch(() => {});
+  }
 
   // ── Init ───────────────────────────────────────────────
   renderQuestion();

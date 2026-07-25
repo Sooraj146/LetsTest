@@ -277,6 +277,7 @@
         email: payload.email,
         examId: payload.examId,
         isSubmitted: payload.isSubmitted,
+        startedAt: payload.startedAt,
       }));
 
       // Store exam details and questions separately for test.html
