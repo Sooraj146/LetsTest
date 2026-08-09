@@ -2195,43 +2195,77 @@ const AdminDashboard = {
         const text = document.getElementById('csvImportText').value.trim();
         if (!text) return notify('CSV values required', 'error');
 
-        const parseCSVLine = (line) => {
-            const result = [];
-            let cur = '';
+        let rawRows = [];
+        if (typeof Papa !== 'undefined') {
+            const parsed = Papa.parse(text, { skipEmptyLines: true });
+            rawRows = parsed.data || [];
+        } else {
+            // Fallback robust state-machine parser
+            const rows = [];
+            let currentRow = [];
+            let currentCell = '';
             let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i + 1];
                 if (char === '"') {
-                    inQuotes = !inQuotes;
+                    if (inQuotes && nextChar === '"') { currentCell += '"'; i++; }
+                    else { inQuotes = !inQuotes; }
                 } else if (char === ',' && !inQuotes) {
-                    result.push(cur.trim());
-                    cur = '';
+                    currentRow.push(currentCell);
+                    currentCell = '';
+                } else if ((char === '\r' || char === '\n') && !inQuotes) {
+                    if (char === '\r' && nextChar === '\n') i++;
+                    currentRow.push(currentCell);
+                    currentCell = '';
+                    if (currentRow.some(c => c.trim().length > 0)) rows.push(currentRow);
+                    currentRow = [];
                 } else {
-                    cur += char;
+                    currentCell += char;
                 }
             }
-            result.push(cur.trim());
-            return result;
-        };
+            if (currentCell.length > 0 || currentRow.length > 0) {
+                currentRow.push(currentCell);
+                if (currentRow.some(c => c.trim().length > 0)) rows.push(currentRow);
+            }
+            rawRows = rows;
+        }
 
-        const lines = text.split('\n');
+        if (!rawRows || rawRows.length === 0) return notify('No data found in CSV', 'error');
+
+        let startIdx = 0;
+        const firstRow = rawRows[0];
+        const col0 = firstRow[0] !== undefined ? String(firstRow[0]).trim().toLowerCase() : '';
+        const col1 = firstRow[1] !== undefined ? String(firstRow[1]).trim().toLowerCase() : '';
+        if (col0.includes('section') || col1.includes('question') || col1.includes('statement')) {
+            startIdx = 1; // Skip header row
+        }
+
         const questions = [];
-        lines.forEach(line => {
-            if (!line.trim()) return;
-            const parts = parseCSVLine(line);
-            if (parts.length < 7) return;
+        for (let r = startIdx; r < rawRows.length; r++) {
+            const parts = rawRows[r];
+            if (!parts || parts.length < 7) continue;
 
-            const section = parts[0] || 'General';
-            const questionText = parts[1];
-            const options = [parts[2], parts[3], parts[4], parts[5]];
-            const correctText = parts[6].trim().toLowerCase();
+            const section = (parts[0] || 'General').trim();
+            const questionText = (parts[1] || '').trim();
+            if (!questionText) continue;
+
+            const options = [
+                (parts[2] || '').trim(),
+                (parts[3] || '').trim(),
+                (parts[4] || '').trim(),
+                (parts[5] || '').trim()
+            ];
+            const correctVal = (parts[6] || '').trim();
 
             let correctAnswer = 0;
-            for (let i = 0; i < 4; i++) {
-                if (options[i] && options[i].trim().toLowerCase() === correctText) {
-                    correctAnswer = i;
-                    break;
-                }
+            const matchIdx = options.findIndex(opt => opt && opt.toLowerCase() === correctVal.toLowerCase());
+            if (matchIdx !== -1) {
+                correctAnswer = matchIdx;
+            } else if (['0', '1', '2', '3'].includes(correctVal)) {
+                correctAnswer = parseInt(correctVal, 10);
+            } else if (['a', 'b', 'c', 'd'].includes(correctVal.toLowerCase())) {
+                correctAnswer = { a: 0, b: 1, c: 2, d: 3 }[correctVal.toLowerCase()];
             }
 
             questions.push({
@@ -2240,9 +2274,9 @@ const AdminDashboard = {
                 options,
                 correctAnswer: String(correctAnswer)
             });
-        });
+        }
 
-        if (questions.length === 0) return notify('No valid questions parsed', 'error');
+        if (questions.length === 0) return notify('No valid questions parsed from CSV', 'error');
 
         try {
             const res = await fetch('/api/admin/questions/bulk', {
