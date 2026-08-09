@@ -39,15 +39,22 @@
     const isPassed = scorePct > 0;
 
     // Check if answer key is restricted by administrator
-    if (data.isAnswerKeyPublished === false) {
-      const akBtn = document.getElementById('downloadAnswerKey');
-      if (akBtn) {
+    const akBtn = document.getElementById('downloadAnswerKey');
+    if (akBtn) {
+      if (data.isAnswerKeyPublished === false) {
         akBtn.style.opacity = '0.6';
-        akBtn.style.cursor = 'not-allowed';
-        akBtn.title = 'Answer key download is restricted by administrator';
+        akBtn.title = 'Answer key is currently restricted by administrator';
         akBtn.innerHTML = `
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
           Key Restricted
+        `;
+      } else {
+        akBtn.style.opacity = '1';
+        akBtn.style.cursor = 'pointer';
+        akBtn.title = 'Download official answer key PDF';
+        akBtn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          Answer Key
         `;
       }
     }
@@ -327,11 +334,6 @@
   }
 
   async function downloadAnswerKey() {
-    if (data && data.isAnswerKeyPublished === false) {
-      LetsTest.toast('Answer key download is restricted by administrator for this exam', 'error');
-      return;
-    }
-
     const btn = document.getElementById('downloadAnswerKey');
     const orig = btn ? btn.innerHTML : '';
     const loadingHtml = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="spin-animation" style="margin-right:6px;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Generating...`;
@@ -350,6 +352,11 @@
 
     try {
       const data = await api.getAnswerKey(examId);
+      if (btn) {
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        btn.title = 'Download official answer key PDF';
+      }
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF('p', 'mm', 'a4');
 
