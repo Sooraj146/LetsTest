@@ -45,43 +45,107 @@ const loginError = document.getElementById('loginError');
 
 // ── Notification Engine ──────────────────────────────────────────────
 function notify(message, type = 'info') {
-    const container = document.getElementById('notificationContainer');
-    if (!container) return;
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
 
     const toast = document.createElement('div');
-    const borderColors = {
-        success: 'border-emerald-500/30 text-emerald-400 background: rgba(16, 185, 129, 0.1);',
-        error: 'border-red-500/30 text-red-400 background: rgba(239, 68, 68, 0.1);',
-        info: 'border-rose-500/30 text-rose-400 background: rgba(255, 51, 68, 0.1);'
+    
+    // Icons & styling configuration
+    const config = {
+        success: {
+            bg: 'rgba(5, 26, 16, 0.94)',
+            border: 'rgba(0, 230, 118, 0.45)',
+            color: '#00e676',
+            shadow: '0 8px 32px rgba(0, 230, 118, 0.25)',
+            icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e676" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`
+        },
+        error: {
+            bg: 'rgba(28, 7, 10, 0.96)',
+            border: 'rgba(255, 23, 68, 0.5)',
+            color: '#ff1744',
+            shadow: '0 8px 32px rgba(255, 23, 68, 0.35)',
+            icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff1744" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+        },
+        warning: {
+            bg: 'rgba(28, 18, 5, 0.96)',
+            border: 'rgba(255, 145, 0, 0.5)',
+            color: '#ff9100',
+            shadow: '0 8px 32px rgba(255, 145, 0, 0.35)',
+            icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff9100" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+        },
+        danger: {
+            bg: 'rgba(28, 7, 10, 0.96)',
+            border: 'rgba(255, 23, 68, 0.5)',
+            color: '#ff1744',
+            shadow: '0 8px 32px rgba(255, 23, 68, 0.35)',
+            icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff1744" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+        },
+        info: {
+            bg: 'rgba(6, 18, 30, 0.94)',
+            border: 'rgba(0, 229, 255, 0.45)',
+            color: '#00e5ff',
+            shadow: '0 8px 32px rgba(0, 229, 255, 0.25)',
+            icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`
+        }
     };
+    
+    const style = config[type] || config.info;
     
     toast.className = 'glass-card toast-item page-enter';
     toast.style.cssText = `
-        padding: 14px 24px;
-        border-radius: 12px;
-        border: 1px solid;
-        margin-top: 10px;
-        font-family: var(--font-heading);
-        font-size: 0.8rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        ${borderColors[type] || borderColors.info}
+        background: ${style.bg} !important;
+        border: 1px solid ${style.border} !important;
+        color: #ffffff !important;
+        box-shadow: ${style.shadow}, 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-radius: 12px !important;
+        padding: 14px 18px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        font-family: 'Outfit', 'Inter', sans-serif !important;
+        font-size: 0.86rem !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.02em !important;
+        pointer-events: auto !important;
+        cursor: pointer !important;
+        transform: translateY(-20px) scale(0.95);
+        opacity: 0;
+        transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
     `;
 
-    toast.innerHTML = `<span>${message}</span>`;
+    toast.innerHTML = `
+        <div style="flex-shrink: 0; display: flex; align-items: center;">${style.icon}</div>
+        <div style="flex: 1; line-height: 1.4; color: #fff;">${message}</div>
+        <button type="button" style="background: none; border: none; color: rgba(255,255,255,0.4); cursor: pointer; padding: 2px 6px; font-size: 1.1rem; line-height: 1; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'" onclick="event.stopPropagation(); this.parentElement.remove()">✕</button>
+    `;
+    
     container.appendChild(toast);
 
-    setTimeout(() => {
+    requestAnimationFrame(() => {
+        toast.style.transform = 'translateY(0) scale(1)';
+        toast.style.opacity = '1';
+    });
+
+    const removeToast = () => {
+        toast.style.transform = 'translateY(-15px) scale(0.9)';
         toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-10px)';
-        toast.style.transition = 'all 0.5s ease-out';
-        setTimeout(() => toast.remove(), 500);
-    }, 4000);
+        setTimeout(() => toast.remove(), 350);
+    };
+
+    const autoTimer = setTimeout(removeToast, 5000);
+    toast.onclick = (e) => {
+        if (e.target.tagName !== 'BUTTON') {
+            clearTimeout(autoTimer);
+            removeToast();
+        }
+    };
 }
 
 // ── Confirmation Prompts ─────────────────────────────────────────────

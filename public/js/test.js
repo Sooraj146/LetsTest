@@ -173,16 +173,10 @@
   });
 
   // ── Server-Authoritative Timer State ──
+  // Candidates who start within the login window get their full allotted duration
   const durationMinutes = Number(examDetails.duration) || 60;
   const startMs = user.startedAt ? new Date(user.startedAt).getTime() : Date.now();
-  let candidateEndMs = startMs + (durationMinutes * 60 * 1000);
-
-  if (examDetails.endTime) {
-    const globalEndMs = new Date(examDetails.endTime).getTime();
-    if (globalEndMs < candidateEndMs) {
-      candidateEndMs = globalEndMs;
-    }
-  }
+  const candidateEndMs = startMs + (durationMinutes * 60 * 1000);
 
   function getRemainingSeconds() {
     return Math.max(0, Math.floor((candidateEndMs - Date.now()) / 1000));

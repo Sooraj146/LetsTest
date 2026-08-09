@@ -4137,4 +4137,95 @@ body {
   letter-spacing: 0.04em;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN POPUPS & MODALS Z-INDEX HIERARCHY
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 1. Base Modal Overlays (Standard level dialogs) */
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000 !important;
+  background: rgba(4, 6, 12, 0.82) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.25s ease !important;
+}
+
+.modal-overlay.active {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.modal-overlay.hidden {
+  display: none !important;
+}
+
+.modal-overlay .modal {
+  position: relative !important;
+  z-index: 10001 !important;
+}
+
+/* 2. Higher Nested Modals (Compile Question, Student Analysis on top of Question Bank) */
+#qbankFormModal.modal-overlay {
+  z-index: 10050 !important;
+}
+#qbankFormModal .modal {
+  z-index: 10051 !important;
+}
+
+.sam-overlay,
+#studentAnalysisModal.sam-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10050 !important;
+  background: rgba(4, 6, 12, 0.85) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* 3. Confirmation Dialog (Always on top of all open modals) */
+#confirmOverlay.modal-overlay {
+  z-index: 100100 !important;
+  background: rgba(2, 3, 7, 0.88) !important;
+}
+#confirmOverlay .modal {
+  z-index: 100101 !important;
+}
+
+/* 4. Image Lightbox (Full view above all forms) */
+.img-lightbox-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100200 !important;
+  background: rgba(4, 6, 12, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* 5. Notification & Toast Engine (Supreme Layer: Always on top of everything) */
+#notificationContainer,
+.toast-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  position: fixed !important;
+  top: 24px !important;
+  right: 24px !important;
+  z-index: 1000000 !important;
+  pointer-events: none !important;
+  max-width: 440px !important;
+  width: calc(100% - 48px) !important;
+}
+
+.toast-item,
+.admin-toast-item {
+  pointer-events: auto !important;
+}
+
 
